@@ -10,8 +10,7 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+// Retain single client instance in both dev and production to prevent connection pool exhaustion on Render/serverless
+globalForPrisma.prisma = prisma;
 
 export default prisma;

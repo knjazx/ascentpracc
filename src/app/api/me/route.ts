@@ -1,72 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser, toSafeUser } from '@/lib/auth';
+import { getCurrentUser, toSafeUser, getRequestBaseUrl } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { updateProfileSchema } from '@/lib/validations/user';
 import { signUserToken } from '@/lib/jwt';
 import { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE } from '@/lib/auth';
 import { fetchSteamUserProfile } from '@/lib/steam';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
+
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
-  let activeUser = user;
-  if (user.nickname.startsWith('Player_')) {
-    const { nickname, avatarUrl } = await fetchSteamUserProfile(
-      user.steamId,
-      process.env.STEAM_API_KEY
-    );
-    if (!nickname.startsWith('Player_')) {
-      const updated = await prisma.user.update({
-        where: { id: user.id },
-        data: { nickname, avatarUrl },
-      });
-      activeUser = toSafeUser(updated);
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401, headers: NO_CACHE_HEADERS }
+      );
     }
-  }
 
-  // Fetch unread notifications count and user's managed teams
-  const [unreadNotifications, managedTeams] = await Promise.all([
-    prisma.notification.count({
-      where: {
-        userId: activeUser.id,
-        read: false,
-      },
-    }),
-    prisma.teamManager.findMany({
-      where: { userId: activeUser.id },
-      include: {
-        team: {
-          select: {
-            id: true,
-            name: true,
-            tag: true,
-            logoUrl: true,
+    let activeUser = user;
+
+    // Optional background refresh for newly registered fallback players if Steam API key is active
+    if (user.nickname.startsWith('Player_') && process.env.STEAM_API_KEY) {
+      try {
+        const { nickname, avatarUrl } = await fetchSteamUserProfile(
+          user.steamId,
+          process.env.STEAM_API_KEY
+        );
+        if (!nickname.startsWith('Player_')) {
+          const updated = await prisma.user.update({
+            where: { id: user.id },
+            data: { nickname, avatarUrl },
+          });
+          activeUser = toSafeUser(updated);
+        }
+      } catch (steamErr) {
+        console.warn('[API /me] Non-critical Steam profile update skipped:', steamErr);
+      }
+    }
+
+    // Safely query unread notifications count and user's managed teams
+    let unreadNotifications = 0;
+    let managedTeams: { team: { id: string; name: string; tag: string; logoUrl: string | null }; isOwner: boolean }[] = [];
+
+    try {
+      const [notifs, teams] = await Promise.all([
+        prisma.notification.count({
+          where: {
+            userId: activeUser.id,
+            read: false,
           },
+        }),
+        prisma.teamManager.findMany({
+          where: { userId: activeUser.id },
+          include: {
+            team: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                logoUrl: true,
+              },
+            },
+          },
+        }),
+      ]);
+      unreadNotifications = notifs;
+      managedTeams = teams;
+    } catch (dbErr) {
+      console.warn('[API /me] Could not load supplementary notifications/teams data:', dbErr);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          ...activeUser,
+          unreadNotifications,
+          teams: managedTeams.map((tm) => ({
+            ...tm.team,
+            isOwner: tm.isOwner,
+          })),
         },
       },
-    }),
-  ]);
-
-  return NextResponse.json({
-    success: true,
-    data: {
-      ...activeUser,
-      unreadNotifications,
-      teams: managedTeams.map((tm) => ({
-        ...tm.team,
-        isOwner: tm.isOwner,
-      })),
-    },
-  });
+      { headers: NO_CACHE_HEADERS }
+    );
+  } catch (err: unknown) {
+    console.error('[API /me] Critical error processing GET /api/me:', err);
+    return NextResponse.json(
+      { success: false, error: 'Server temporarily unavailable' },
+      { status: 500, headers: NO_CACHE_HEADERS }
+    );
+  }
 }
 
 export async function PATCH(request: NextRequest) {
   const currentUser = await getCurrentUser();
   if (!currentUser) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401, headers: NO_CACHE_HEADERS }
+    );
   }
 
   try {
@@ -96,14 +138,20 @@ export async function PATCH(request: NextRequest) {
       onboarded: updatedUser.onboarded,
     });
 
-    const response = NextResponse.json({
-      success: true,
-      data: toSafeUser(updatedUser),
-    });
+    const response = NextResponse.json(
+      {
+        success: true,
+        data: toSafeUser(updatedUser),
+      },
+      { headers: NO_CACHE_HEADERS }
+    );
+
+    const baseUrl = getRequestBaseUrl(request);
+    const isHttps = baseUrl.startsWith('https://');
 
     response.cookies.set(AUTH_COOKIE_NAME, newToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       maxAge: AUTH_COOKIE_MAX_AGE,
       path: '/',

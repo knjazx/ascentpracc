@@ -1,15 +1,15 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import './src/lib/patch';
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { Server as SocketIOServer } from 'socket.io';
-import * as dotenv from 'dotenv';
 import { socketAuthMiddleware, AuthenticatedSocket } from './src/lib/socket/auth';
 import { registerMatchHandlers } from './src/lib/socket/match-handler';
 import { registerVetoHandlers } from './src/lib/socket/veto-handler';
 import { ensureDatabaseRunning } from './src/lib/db-server';
-
-dotenv.config();
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);

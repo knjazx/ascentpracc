@@ -38,13 +38,21 @@ export async function socketAuthMiddleware(
     }
 
     const payload = await verifyUserToken(token);
-    if (!payload || !payload.userId) {
+    if (!payload || (!payload.userId && !payload.steamId)) {
       return next(new Error('Unauthorized: Invalid or expired token'));
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-    });
+    let user = payload.userId
+      ? await prisma.user.findUnique({
+          where: { id: payload.userId },
+        })
+      : null;
+
+    if (!user && payload.steamId) {
+      user = await prisma.user.findUnique({
+        where: { steamId: payload.steamId },
+      });
+    }
 
     if (!user) {
       return next(new Error('Unauthorized: User not found'));

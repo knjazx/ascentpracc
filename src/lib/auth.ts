@@ -87,13 +87,39 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
     }
 
     const payload = await verifyUserToken(token);
-    if (!payload || !payload.userId) {
+    if (!payload || (!payload.userId && !payload.steamId)) {
       return null;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-    });
+    let user: User | null = null;
+    let attempts = 0;
+
+    // Retry loop with short backoff to seamlessly handle database cold start / Neon wake up
+    while (attempts < 3) {
+      try {
+        attempts++;
+        if (payload.userId) {
+          user = await prisma.user.findUnique({
+            where: { id: payload.userId },
+          });
+        }
+
+        // Fallback: If not found by CUID (e.g. database re-seeded or id mismatched),
+        // look up by permanent immutable SteamID
+        if (!user && payload.steamId) {
+          user = await prisma.user.findUnique({
+            where: { steamId: payload.steamId },
+          });
+        }
+        break;
+      } catch (dbError) {
+        console.warn(`[getCurrentUser] Database query attempt ${attempts} failed:`, dbError);
+        if (attempts >= 3) {
+          throw dbError;
+        }
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    }
 
     if (!user) {
       return null;

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_cs2_scrim_league_at_least_32_chars_long';
-const key = new TextEncoder().encode(JWT_SECRET);
+const DEFAULT_JWT_SECRET = 'super_secret_jwt_key_cs2_scrim_league_at_least_32_chars_long';
 const AUTH_COOKIE_NAME = 'cs2_session';
 
 interface TokenPayload {
@@ -35,6 +34,40 @@ function getSafeRedirectUrl(targetPath: string, request: NextRequest): URL {
   return new URL(targetPath, origin);
 }
 
+async function verifySessionToken(token: string): Promise<TokenPayload | null> {
+  const primarySecret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+  const primaryKey = new TextEncoder().encode(primarySecret);
+
+  try {
+    const { payload } = await jwtVerify(token, primaryKey, { algorithms: ['HS256'] });
+    return {
+      userId: payload.userId as string,
+      steamId: payload.steamId as string,
+      role: payload.role as string,
+      banned: Boolean(payload.banned),
+      onboarded: Boolean(payload.onboarded),
+    };
+  } catch {
+    // If primary secret verification fails and a custom secret was configured, try default fallback
+    if (process.env.JWT_SECRET && process.env.JWT_SECRET !== DEFAULT_JWT_SECRET) {
+      try {
+        const fallbackKey = new TextEncoder().encode(DEFAULT_JWT_SECRET);
+        const { payload } = await jwtVerify(token, fallbackKey, { algorithms: ['HS256'] });
+        return {
+          userId: payload.userId as string,
+          steamId: payload.steamId as string,
+          role: payload.role as string,
+          banned: Boolean(payload.banned),
+          onboarded: Boolean(payload.onboarded),
+        };
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -54,18 +87,7 @@ export async function middleware(request: NextRequest) {
   let session: TokenPayload | null = null;
 
   if (token) {
-    try {
-      const { payload } = await jwtVerify(token, key, { algorithms: ['HS256'] });
-      session = {
-        userId: payload.userId as string,
-        steamId: payload.steamId as string,
-        role: payload.role as string,
-        banned: Boolean(payload.banned),
-        onboarded: Boolean(payload.onboarded),
-      };
-    } catch {
-      session = null;
-    }
+    session = await verifySessionToken(token);
   }
 
   // 1. If banned, enforce /banned page
