@@ -21,6 +21,11 @@ function isPortOpen(port: number, host: string = '127.0.0.1'): Promise<boolean> 
 }
 
 export async function ensureDatabaseRunning(): Promise<void> {
+  // Production / Render / Cloud environments always use remote database (Neon PostgreSQL), never local embedded postgres
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.VERCEL) {
+    return;
+  }
+
   const dbUrl = process.env.DATABASE_URL || '';
   if (dbUrl && !dbUrl.includes('localhost') && !dbUrl.includes('127.0.0.1')) {
     // Production/remote database (Neon, Supabase, Render), skip local embedded postgres
