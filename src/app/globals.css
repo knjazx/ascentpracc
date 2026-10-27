@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 225 10% 16%; /* #24262d - выразительный киберспортивный серый фон */
+    --foreground: 0 0% 98%;
+
+    --card: 225 12% 7%; /* #101114 - глубокие контрастные непрозрачные карточки */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 225 12% 8%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 5%;
+
+    --secondary: 225 10% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 225 10% 20%;
+    --muted-foreground: 220 5% 65%;
+
+    --accent: 225 10% 22%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 0% 90%;
+    --destructive-foreground: 0 0% 5%;
+
+    --border: 225 10% 26%; /* #393c47 - четкие видимые контуры */
+    --input: 225 10% 26%;
+    --ring: 0 0% 98%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased min-h-screen selection:bg-white/20 selection:text-white;
+    background-color: #24262d;
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.04) 0%, transparent 60%),
+      radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+}
+
+/* Custom esports scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #24262d;
+}
+::-webkit-scrollbar-thumb {
+  background: #424652;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #5a5f6e;
+}

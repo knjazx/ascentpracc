@@ -1,0 +1,413 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ScrimFormat {
+  BO1
+  BO2
+  BO3
+}
+
+enum ServerBy {
+  HOST
+  GUEST
+  NEGOTIABLE
+}
+
+enum ScrimStatus {
+  OPEN
+  MATCHED
+  CANCELLED
+  EXPIRED
+}
+
+enum ResponseStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum MatchStatus {
+  SCHEDULED
+  VETO
+  LIVE
+  AWAITING_RESULT
+  CONFIRMED
+  DISPUTED
+  CANCELLED
+}
+
+enum VetoType {
+  BAN
+  PICK
+  SIDE
+  DECIDER
+}
+
+enum SideChoice {
+  CT
+  T
+}
+
+enum RescheduleStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum ReportTargetType {
+  USER
+  TEAM
+  MATCH
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id          String   @id @default(cuid())
+  steamId     String   @unique
+  nickname    String
+  avatarUrl   String
+  timezone    String   @default("Europe/Kyiv")
+  discordTag  String?
+  role        Role     @default(USER)
+  banned      Boolean  @default(false)
+  onboarded   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teams           TeamManager[]
+  chatMessages    ChatMessage[]
+  auditLogs       AuditLog[]
+  reportsMade     Report[]        @relation("UserReports")
+  notifications   Notification[]
+
+  @@index([steamId])
+  @@index([role])
+  @@index([banned])
+}
+
+model Team {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  tag           String   @unique
+  logoUrl       String?
+  description   String?
+  discordInvite String?
+  avgElo        Int?
+  noShowCount   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  managers            TeamManager[]
+  scrimRequests       ScrimRequest[]
+  scrimResponses      ScrimResponse[]
+  matchesAsTeamA      Match[]             @relation("TeamAMatches")
+  matchesAsTeamB      Match[]             @relation("TeamBMatches")
+  stats               TeamStats?
+  chatMessages        ChatMessage[]
+  rescheduleRequests  RescheduleRequest[] @relation("RescheduleByTeam")
+  ratingsReceived     TeamRating[]        @relation("RatedTeam")
+  ratingsGiven        TeamRating[]        @relation("RatingAuthorTeam")
+  blacklistsCreated   TeamBlacklist[]     @relation("TeamBlacklistOwner")
+  blacklistedBy       TeamBlacklist[]     @relation("TeamBlacklistTarget")
+
+  @@index([name])
+  @@index([tag])
+}
+
+model TeamManager {
+  teamId    String
+  userId    String
+  isOwner   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
+}
+
+model ScrimRequest {
+  id              String      @id @default(cuid())
+  teamId          String
+  format          ScrimFormat
+  level           String?
+  serverBy        ServerBy    @default(NEGOTIABLE)
+  serverLocations String[]    @default([])
+  platform        String      @default("CYBERSHOCK")
+  excludedMaps String[]    @default([])
+  comment      String?
+  status       ScrimStatus @default(OPEN)
+  expiresAt    DateTime
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  team      Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  slots     ScrimSlot[]
+  responses ScrimResponse[]
+  match     Match?
+
+  @@index([status, expiresAt])
+  @@index([teamId])
+  @@index([createdAt])
+}
+
+model ScrimSlot {
+  id          String   @id @default(cuid())
+  requestId   String
+  startsAt    DateTime
+  durationMin Int      @default(120)
+
+  request   ScrimRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  responses ScrimResponse[]
+
+  @@index([requestId])
+  @@index([startsAt])
+}
+
+model ScrimResponse {
+  id         String         @id @default(cuid())
+  requestId  String
+  teamId     String
+  slotId     String?
+  proposedAt DateTime?
+  message    String?
+  status     ResponseStatus @default(PENDING)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  request ScrimRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  team    Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  slot    ScrimSlot?   @relation(fields: [slotId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, status])
+  @@index([teamId])
+  @@index([createdAt])
+}
+
+model Match {
+  id               String      @id @default(cuid())
+  requestId        String?     @unique
+  teamAId          String
+  teamBId          String
+  format           ScrimFormat
+  platform         String?     @default("CYBERSHOCK")
+  scheduledAt      DateTime
+  status           MatchStatus @default(SCHEDULED)
+  winnerId         String?
+  serverInfo       Json?
+  coinFlipWinnerId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  request            ScrimRequest?       @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  teamA              Team                @relation("TeamAMatches", fields: [teamAId], references: [id], onDelete: Cascade)
+  teamB              Team                @relation("TeamBMatches", fields: [teamBId], references: [id], onDelete: Cascade)
+  vetoActions        VetoAction[]
+  maps               MatchMap[]
+  chatMessages       ChatMessage[]
+  auditLogs          AuditLog[]
+  rescheduleRequests RescheduleRequest[]
+  ratings            TeamRating[]
+
+  @@index([teamAId])
+  @@index([teamBId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model VetoAction {
+  id        String    @id @default(cuid())
+  matchId   String
+  order     Int
+  teamId    String?
+  type      VetoType
+  map       String
+  side      SideChoice?
+  createdAt DateTime  @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, order])
+}
+
+model MatchMap {
+  id          String   @id @default(cuid())
+  matchId     String
+  order       Int
+  map         String
+  pickedBy    String?
+  scoreA_byA  Int?
+  scoreB_byA  Int?
+  scoreA_byB  Int?
+  scoreB_byB  Int?
+  finalScoreA Int?
+  finalScoreB Int?
+  startSideA  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, order])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  matchId   String
+  userId    String?
+  teamId    String?
+  system    Boolean  @default(false)
+  text      String   @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  team  Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@index([matchId, createdAt])
+}
+
+model Report {
+  id          String           @id @default(cuid())
+  reporterId  String
+  targetType  ReportTargetType
+  targetId    String
+  reason      String           @db.Text
+  status      ReportStatus     @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  reporter User @relation("UserReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([reporterId])
+}
+
+model MapPool {
+  id          String   @id @default(cuid())
+  map         String   @unique
+  displayName String
+  active      Boolean  @default(true)
+  defaultPool Boolean  @default(true)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  matchId   String
+  userId    String?
+  action    String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([matchId, createdAt])
+}
+
+model RescheduleRequest {
+  id         String           @id @default(cuid())
+  matchId    String
+  proposedAt DateTime
+  byTeamId   String
+  status     RescheduleStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  byTeam Team  @relation("RescheduleByTeam", fields: [byTeamId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, status])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model TeamStats {
+  id            String   @id @default(cuid())
+  teamId        String   @unique
+  matchesPlayed Int      @default(0)
+  wins          Int      @default(0)
+  losses        Int      @default(0)
+  draws         Int      @default(0)
+  winRate       Float    @default(0.0)
+  form          String   @default("")
+  mapStats      Json     @default("{}")
+  h2h           Json     @default("{}")
+  updatedAt     DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([winRate, matchesPlayed])
+}
+
+model TeamRating {
+  id            String   @id @default(cuid())
+  matchId       String
+  ratedTeamId   String
+  byTeamId      String
+  punctuality   Int
+  sportsmanship Int
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  match     Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  ratedTeam Team  @relation("RatedTeam", fields: [ratedTeamId], references: [id], onDelete: Cascade)
+  byTeam    Team  @relation("RatingAuthorTeam", fields: [byTeamId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, ratedTeamId, byTeamId])
+  @@index([ratedTeamId])
+  @@index([byTeamId])
+}
+
+model TeamBlacklist {
+  id            String   @id @default(cuid())
+  teamId        String
+  blockedTeamId String
+  createdAt     DateTime @default(now())
+
+  team        Team @relation("TeamBlacklistOwner", fields: [teamId], references: [id], onDelete: Cascade)
+  blockedTeam Team @relation("TeamBlacklistTarget", fields: [blockedTeamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, blockedTeamId])
+  @@index([teamId])
+}
