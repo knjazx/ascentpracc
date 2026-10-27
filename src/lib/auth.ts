@@ -14,25 +14,34 @@ export function getRequestBaseUrl(request: NextRequest): string {
   // 1. Check proxy forwarding headers (Render, Vercel, Cloudflare, etc.)
   const forwardedProto = request.headers.get('x-forwarded-proto');
   const forwardedHost = request.headers.get('x-forwarded-host');
-  if (forwardedHost) {
+  if (forwardedHost && !forwardedHost.includes('0.0.0.0')) {
     const proto = (forwardedProto || 'https').split(',')[0].trim();
     return `${proto}://${forwardedHost.split(',')[0].trim()}`;
   }
 
-  // 2. Check Host header
+  // 2. Check Host header (ignore 0.0.0.0 as it's an internal bind interface, not a public host)
   const host = request.headers.get('host');
-  if (host) {
-    const proto = request.nextUrl.protocol ? request.nextUrl.protocol.replace(':', '') : 'http';
+  if (host && !host.includes('0.0.0.0')) {
+    const proto = forwardedProto || (request.nextUrl.protocol ? request.nextUrl.protocol.replace(':', '') : 'http');
     return `${proto}://${host}`;
   }
 
-  // 3. Fallback to nextUrl origin
-  if (request.nextUrl.origin && request.nextUrl.origin !== 'null') {
+  // 3. Check environment variable NEXT_PUBLIC_APP_URL
+  if (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('0.0.0.0')) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+
+  // 4. Fallback to nextUrl origin if not 0.0.0.0
+  if (request.nextUrl.origin && request.nextUrl.origin !== 'null' && !request.nextUrl.origin.includes('0.0.0.0')) {
     return request.nextUrl.origin;
   }
 
-  // 4. Fallback to environment variable or localhost
-  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  return 'http://localhost:3000';
+}
+
+export function createSafeRedirectUrl(pathnameAndQuery: string, request: NextRequest): URL {
+  const baseUrl = getRequestBaseUrl(request);
+  return new URL(pathnameAndQuery, baseUrl);
 }
 
 export function toSafeUser(user: User): SafeUser {

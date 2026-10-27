@@ -13,6 +13,28 @@ interface TokenPayload {
   onboarded: boolean;
 }
 
+function getSafeRedirectUrl(targetPath: string, request: NextRequest): URL {
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (forwardedHost && !forwardedHost.includes('0.0.0.0')) {
+    const proto = (forwardedProto || 'https').split(',')[0].trim();
+    return new URL(targetPath, `${proto}://${forwardedHost.split(',')[0].trim()}`);
+  }
+
+  const host = request.headers.get('host');
+  if (host && !host.includes('0.0.0.0')) {
+    const proto = forwardedProto || (request.nextUrl.protocol ? request.nextUrl.protocol.replace(':', '') : 'http');
+    return new URL(targetPath, `${proto}://${host}`);
+  }
+
+  if (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('0.0.0.0')) {
+    return new URL(targetPath, process.env.NEXT_PUBLIC_APP_URL);
+  }
+
+  const origin = request.nextUrl.origin.replace('0.0.0.0', 'localhost');
+  return new URL(targetPath, origin);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -48,17 +70,17 @@ export async function middleware(request: NextRequest) {
 
   // 1. If banned, enforce /banned page
   if (session?.banned && pathname !== '/banned') {
-    return NextResponse.redirect(new URL('/banned', request.url));
+    return NextResponse.redirect(getSafeRedirectUrl('/banned', request));
   }
 
   // 2. Already logged in accessing /login
   if (session && !session.banned && pathname === '/login') {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(getSafeRedirectUrl('/', request));
   }
 
   // 3. User logged in but not onboarded
   if (session && !session.banned && !session.onboarded && pathname !== '/onboarding' && pathname !== '/banned') {
-    const onboardingUrl = new URL('/onboarding', request.url);
+    const onboardingUrl = getSafeRedirectUrl('/onboarding', request);
     if (pathname !== '/') {
       onboardingUrl.searchParams.set('next', pathname);
     }
@@ -67,7 +89,7 @@ export async function middleware(request: NextRequest) {
 
   // 4. User already onboarded attempting to visit /onboarding
   if (session && session.onboarded && pathname === '/onboarding') {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(getSafeRedirectUrl('/', request));
   }
 
   // 5. Protected routes requiring authentication
@@ -83,7 +105,7 @@ export async function middleware(request: NextRequest) {
   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route)) || pathname.endsWith('/edit');
 
   if (isProtected && !session) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = getSafeRedirectUrl('/login', request);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -91,7 +113,7 @@ export async function middleware(request: NextRequest) {
   // 6. Admin routes check
   if (pathname.startsWith('/admin')) {
     if (!session || session.role !== 'ADMIN') {
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(getSafeRedirectUrl('/', request));
     }
   }
 

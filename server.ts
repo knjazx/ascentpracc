@@ -12,10 +12,12 @@ import { ensureDatabaseRunning } from './src/lib/db-server';
 dotenv.config();
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = dev ? 'localhost' : '0.0.0.0';
 const port = parseInt(process.env.PORT || '3000', 10);
 
-const app = next({ dev, hostname, port });
+// In Next.js, passing hostname: '0.0.0.0' corrupts request URLs with 0.0.0.0.
+// In dev, 'localhost' is fine. In production behind a proxy (Render/Vercel),
+// omitting hostname lets Next.js dynamically read the client's Host and X-Forwarded-Host.
+const app = next(dev ? { dev, hostname: 'localhost', port } : { dev, port });
 const handle = app.getRequestHandler();
 
 let isNextReady = false;

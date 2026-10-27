@@ -5,6 +5,7 @@ import {
   AUTH_COOKIE_MAX_AGE,
   sanitizeNextUrl,
   getRequestBaseUrl,
+  createSafeRedirectUrl,
 } from '@/lib/auth';
 import { signUserToken } from '@/lib/jwt';
 import { Role } from '@prisma/client';
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     onboarded: user.onboarded,
   });
 
-  const redirectUrl = new URL(cleanNext, request.url);
+  const redirectUrl = createSafeRedirectUrl(cleanNext, request);
   const response = NextResponse.redirect(redirectUrl);
 
   const baseUrl = getRequestBaseUrl(request);

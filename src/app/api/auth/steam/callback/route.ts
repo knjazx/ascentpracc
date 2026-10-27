@@ -7,6 +7,7 @@ import {
   isSteamIdAdmin,
   sanitizeNextUrl,
   getRequestBaseUrl,
+  createSafeRedirectUrl,
 } from '@/lib/auth';
 import { signUserToken } from '@/lib/jwt';
 import { rateLimit } from '@/lib/rate-limit';
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     const { success: allowed } = await rateLimit(`steam-callback:${ip}`, 30, 60);
     if (!allowed) {
       console.warn(`[Steam Auth] Rate limited IP: ${ip}`);
-      return NextResponse.redirect(new URL('/login?error=rate_limited', request.url));
+      return NextResponse.redirect(createSafeRedirectUrl('/login?error=rate_limited', request));
     }
   } catch (err) {
     console.warn('[Steam Auth] Rate limiter error ignored:', err);
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 
   // 2. Check for user cancellation
   if (searchParams.get('openid.mode') === 'cancel') {
-    return NextResponse.redirect(new URL('/login?error=cancelled', request.url));
+    return NextResponse.redirect(createSafeRedirectUrl('/login?error=cancelled', request));
   }
 
   // 3. Verify Nonce from cookie against query param
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   if (cookieNonce && queryNonce && cookieNonce !== queryNonce) {
     console.warn('[Steam Auth] Nonce mismatch:', { cookieNonce, queryNonce });
-    return NextResponse.redirect(new URL('/login?error=invalid_nonce', request.url));
+    return NextResponse.redirect(createSafeRedirectUrl('/login?error=invalid_nonce', request));
   }
 
   // 4. Validate return_to parameter
@@ -57,11 +58,11 @@ export async function GET(request: NextRequest) {
       const returnUrl = new URL(returnTo);
       if (!returnUrl.pathname.endsWith('/api/auth/steam/callback')) {
         console.error('[Steam Auth] Invalid return_to pathname:', returnUrl.pathname);
-        return NextResponse.redirect(new URL('/login?error=invalid_return_to', request.url));
+        return NextResponse.redirect(createSafeRedirectUrl('/login?error=invalid_return_to', request));
       }
     } catch {
       console.error('[Steam Auth] Malformed return_to URL:', returnTo);
-      return NextResponse.redirect(new URL('/login?error=invalid_return_to', request.url));
+      return NextResponse.redirect(createSafeRedirectUrl('/login?error=invalid_return_to', request));
     }
   }
 
@@ -85,11 +86,11 @@ export async function GET(request: NextRequest) {
     const verifyText = await verifyResponse.text();
     if (!verifyText.includes('is_valid:true')) {
       console.error('[Steam Auth] Signature verification failed. Steam response:', verifyText);
-      return NextResponse.redirect(new URL('/login?error=signature_failed', request.url));
+      return NextResponse.redirect(createSafeRedirectUrl('/login?error=signature_failed', request));
     }
   } catch (err) {
     console.error('[Steam Auth] Verification network error:', err);
-    return NextResponse.redirect(new URL('/login?error=steam_unavailable', request.url));
+    return NextResponse.redirect(createSafeRedirectUrl('/login?error=steam_unavailable', request));
   }
 
   // 6. Extract 64-bit SteamID from claimed_id
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
   const steamIdMatch = claimedId.match(/^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17,25})$/);
   if (!steamIdMatch || !steamIdMatch[1]) {
     console.error('[Steam Auth] Could not extract SteamID from claimed_id:', claimedId);
-    return NextResponse.redirect(new URL('/login?error=invalid_steam_id', request.url));
+    return NextResponse.redirect(createSafeRedirectUrl('/login?error=invalid_steam_id', request));
   }
   const steamId = steamIdMatch[1];
 
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
 
   // 9. Check if user is banned
   if (user.banned) {
-    const bannedResponse = NextResponse.redirect(new URL('/banned', request.url));
+    const bannedResponse = NextResponse.redirect(createSafeRedirectUrl('/banned', request));
     bannedResponse.cookies.delete(NONCE_COOKIE_NAME);
     return bannedResponse;
   }
@@ -142,9 +143,11 @@ export async function GET(request: NextRequest) {
   });
 
   // 11. Determine redirect target (onboarding if not finished, else cleanNext)
-  const redirectTarget = !user.onboarded
-    ? new URL(`/onboarding?next=${encodeURIComponent(cleanNext)}`, request.url)
-    : new URL(cleanNext, request.url);
+  const redirectPath = !user.onboarded
+    ? `/onboarding?next=${encodeURIComponent(cleanNext)}`
+    : cleanNext;
+
+  const redirectTarget = createSafeRedirectUrl(redirectPath, request);
 
   console.log(`[Steam Auth] Success! User logged in: ${user.nickname} (${user.steamId}) -> ${redirectTarget.toString()}`);
 
