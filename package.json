@@ -6,7 +6,7 @@
     "dev": "tsx server.ts",
     "build": "next build",
     "start": "tsx server.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate || true",
     "worker": "tsx src/worker/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
