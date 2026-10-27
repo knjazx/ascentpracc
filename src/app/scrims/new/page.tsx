@@ -93,8 +93,14 @@ export default function CreateScrimPage() {
 
   const toggleLocation = (city: string) => {
     if (selectedLocations.includes(city)) {
+      setError(null);
       setSelectedLocations(selectedLocations.filter((c) => c !== city));
     } else {
+      if (selectedLocations.length >= 4) {
+        setError('Можно выбрать не более 4 серверов');
+        return;
+      }
+      setError(null);
       setSelectedLocations([...selectedLocations, city]);
     }
   };
@@ -155,6 +161,10 @@ export default function CreateScrimPage() {
           durationMin: Number(s.durationMin),
         };
       });
+
+      if (selectedLocations.length > 4) {
+        throw new Error('Можно выбрать не более 4 серверов');
+      }
 
       const res = await fetch('/api/scrims', {
         method: 'POST',
@@ -332,19 +342,35 @@ export default function CreateScrimPage() {
             <div className="space-y-3 p-4 rounded-xl border border-border bg-card shadow-xl shadow-black/40">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
                 <div className="space-y-0.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-white flex items-center gap-1.5 font-mono">
-                    <Server className="w-3.5 h-3.5 text-white" />
-                    <span>Выбор сервера *</span>
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white flex items-center gap-1.5 font-mono">
+                      <Server className="w-3.5 h-3.5 text-white" />
+                      <span>Выбор сервера *</span>
+                    </label>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border transition-colors ${
+                        selectedLocations.length === 4
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : selectedLocations.length > 0
+                          ? 'bg-white/10 text-white border-white/20'
+                          : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+                      }`}
+                    >
+                      {selectedLocations.length}/4
+                    </span>
+                  </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Выберите одну или несколько локаций либо укажите «По договоренности»
+                    Выберите до 4 локаций либо укажите «По договоренности»
                   </p>
                 </div>
 
                 {/* By Agreement Button */}
                 <button
                   type="button"
-                  onClick={() => setSelectedLocations([])}
+                  onClick={() => {
+                    setError(null);
+                    setSelectedLocations([]);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 shrink-0 ${
                     selectedLocations.length === 0
                       ? 'bg-white text-black border-white shadow-md font-black'
@@ -360,14 +386,18 @@ export default function CreateScrimPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                 {SERVER_LOCATIONS.map((loc) => {
                   const isChecked = selectedLocations.includes(loc.city);
+                  const isMaxReached = selectedLocations.length >= 4 && !isChecked;
+
                   return (
                     <div
                       key={loc.id}
                       onClick={() => toggleLocation(loc.city)}
-                      className={`flex items-center justify-between p-2.5 sm:p-3 rounded-lg border transition-all cursor-pointer select-none ${
+                      className={`flex items-center justify-between p-2.5 sm:p-3 rounded-lg border transition-all select-none ${
                         isChecked
-                          ? 'border-white bg-cs-panel shadow-md ring-1 ring-white/20'
-                          : 'border-border bg-cs-panel/60 hover:border-neutral-500 hover:bg-cs-panel'
+                          ? 'border-white bg-cs-panel shadow-md ring-1 ring-white/20 cursor-pointer'
+                          : isMaxReached
+                          ? 'border-border/40 bg-cs-panel/40 opacity-40 cursor-not-allowed'
+                          : 'border-border bg-cs-panel/60 hover:border-neutral-500 hover:bg-cs-panel cursor-pointer'
                       }`}
                     >
                       {/* Left: Flag + City name */}
@@ -383,6 +413,8 @@ export default function CreateScrimPage() {
                         className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
                           isChecked
                             ? 'bg-white border-white text-black'
+                            : isMaxReached
+                            ? 'border-neutral-700 bg-neutral-900/40'
                             : 'border-neutral-600 bg-neutral-900/80'
                         }`}
                       >
@@ -398,7 +430,7 @@ export default function CreateScrimPage() {
                 <span className="font-bold text-white">
                   {selectedLocations.length === 0
                     ? 'По договоренности'
-                    : selectedLocations.join(', ')}
+                    : `${selectedLocations.join(', ')} (${selectedLocations.length}/4)`}
                 </span>
               </div>
             </div>

@@ -16,7 +16,10 @@ export const scrimCreateSchema = z.object({
   format: z.nativeEnum(ScrimFormat, { errorMap: () => ({ message: 'Выберите формат (BO1, BO2 или BO3)' }) }),
   level: z.string().trim().max(50, 'Уровень не может превышать 50 символов').optional().nullable(),
   serverBy: z.nativeEnum(ServerBy).default(ServerBy.NEGOTIABLE),
-  serverLocations: z.array(z.string()).default([]),
+  serverLocations: z
+    .array(z.string())
+    .max(4, 'Можно выбрать не более 4 серверов')
+    .default([]),
   platform: z
     .enum(['CYBERSHOCK', 'XPLAY', 'FASTCUP', 'OTHER'], {
       errorMap: () => ({ message: 'Выберите платформу (Cybershock, Xplay, Fastcup или Другой)' }),
