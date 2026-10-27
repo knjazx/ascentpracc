@@ -25,6 +25,8 @@ import {
   MessageSquare,
   Trophy,
   Globe,
+  Gamepad2,
+  Quote,
 } from 'lucide-react';
 import { SERVER_LOCATION_MAP } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
@@ -276,17 +278,37 @@ export default function ScrimDetailPage() {
   };
 
   const statusBadges = {
-    OPEN: <Badge variant="cs">Открыта</Badge>,
-    MATCHED: <Badge variant="live">Матч назначен</Badge>,
-    CANCELLED: <Badge variant="destructive">Отменена</Badge>,
-    EXPIRED: <Badge variant="secondary">Истекла</Badge>,
+    OPEN: (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold uppercase tracking-wider">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        Открыта
+      </span>
+    ),
+    MATCHED: (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-xs font-bold uppercase tracking-wider">
+        <Swords className="w-3.5 h-3.5" />
+        Матч назначен
+      </span>
+    ),
+    CANCELLED: (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs font-bold uppercase tracking-wider">
+        <XCircle className="w-3.5 h-3.5" />
+        Отменена
+      </span>
+    ),
+    EXPIRED: (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-400 font-mono text-xs font-bold uppercase tracking-wider">
+        <Clock className="w-3.5 h-3.5" />
+        Истекла
+      </span>
+    ),
   };
 
   return (
-    <div className="container max-w-4xl py-8 space-y-8">
+    <div className="container max-w-4xl py-8 space-y-6">
       {/* Matched Banner */}
       {scrim.status === 'MATCHED' && scrim.match && (
-        <div className="flex items-center justify-between p-4 rounded-xl border border-white/30 bg-card shadow-xl shadow-black/40 text-white">
+        <div className="flex items-center justify-between p-4 rounded-xl border border-white/20 bg-neutral-900 shadow-xl shadow-black/40 text-white">
           <div className="flex items-center gap-3">
             <Swords className="w-6 h-6 text-white shrink-0" />
             <div>
@@ -311,53 +333,55 @@ export default function ScrimDetailPage() {
       )}
 
       {/* Main Scrim Card */}
-      <Card className="border border-border bg-card shadow-xl shadow-black/40 relative overflow-hidden">
+      <Card className="border border-neutral-800 bg-neutral-950/70 shadow-2xl shadow-black/60 relative overflow-hidden rounded-2xl">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-neutral-700 via-white to-neutral-700" />
 
-        <CardHeader className="pb-4 pt-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <CardHeader className="pb-5 pt-7 px-6 sm:px-8 border-b border-neutral-800/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             {/* Host Team Info */}
             <div className="flex items-center gap-4">
               <Link href={`/teams/${scrim.team.id}`}>
-                <div className="relative w-14 h-14 rounded-xl bg-cs-panel border border-border flex items-center justify-center overflow-hidden shrink-0">
+                <div className="relative w-16 h-16 rounded-2xl bg-neutral-900 border border-neutral-700/80 flex items-center justify-center overflow-hidden shrink-0 shadow-lg group hover:border-neutral-500 transition-colors">
                   {scrim.team.logoUrl ? (
                     <Image
                       src={scrim.team.logoUrl}
                       alt={scrim.team.name}
-                      width={56}
-                      height={56}
-                      className="object-cover w-full h-full"
+                      width={64}
+                      height={64}
+                      className="object-cover w-full h-full group-hover:scale-105 transition-transform"
                       unoptimized
                     />
                   ) : (
-                    <span className="font-mono font-black text-white text-sm">
+                    <span className="font-mono font-black text-white text-base">
                       {scrim.team.tag}
                     </span>
                   )}
                 </div>
               </Link>
 
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
                   <Link
                     href={`/teams/${scrim.team.id}`}
-                    className="font-bold text-xl text-foreground hover:text-white transition-colors"
+                    className="font-black text-2xl text-foreground hover:text-white transition-colors tracking-tight"
                   >
                     {scrim.team.name}
                   </Link>
-                  <span className="text-sm font-mono font-bold text-neutral-400">
+                  <span className="text-xs font-mono font-bold text-neutral-300 bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700">
                     [{scrim.team.tag}]
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono mt-0.5">
-                  <span>Винрейт: {scrim.team.stats?.winRate ? Math.round(scrim.team.stats.winRate * 100) : 0}%</span>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                  <span className="text-neutral-300 font-semibold">
+                    Винрейт: {scrim.team.stats?.winRate ? Math.round(scrim.team.stats.winRate * 100) : 0}%
+                  </span>
                   <span>•</span>
                   <span>{scrim.team.stats?.matchesPlayed || 0} матчей</span>
                 </div>
               </div>
             </div>
 
-            {/* Status & Cancel */}
+            {/* Status & Cancel Action */}
             <div className="flex items-center gap-3">
               {statusBadges[scrim.status]}
               {scrim.isAuthor && scrim.status === 'OPEN' && (
@@ -365,7 +389,7 @@ export default function ScrimDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleCancelScrim}
-                  className="text-xs text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40"
+                  className="text-xs font-semibold text-rose-400 border-rose-500/30 hover:bg-rose-500/10 hover:border-rose-500/60 transition-colors"
                 >
                   Отменить заявку
                 </Button>
@@ -374,71 +398,105 @@ export default function ScrimDetailPage() {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6 pt-2">
-          {/* Key Attributes Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs font-mono">
-            <div className="p-3 rounded-lg border border-border bg-cs-panel space-y-1">
-              <span className="text-muted-foreground uppercase">Формат</span>
-              <p className="font-bold text-foreground text-sm">{scrim.format}</p>
-            </div>
-
-            <div className="p-3 rounded-lg border border-border bg-cs-panel space-y-1">
-              <span className="text-muted-foreground uppercase">Платформа</span>
-              <p className="font-bold text-white text-sm">{platformLabels[scrim.platform || 'CYBERSHOCK'] || scrim.platform || 'Cybershock'}</p>
-            </div>
-
-            <div className="p-3 rounded-lg border border-border bg-cs-panel space-y-1">
-              <span className="text-muted-foreground uppercase">Сервер</span>
-              <div className="font-bold text-foreground text-sm truncate flex items-center gap-1.5">
-                {scrim.serverLocations && scrim.serverLocations.length > 0 ? (
-                  <span className="flex items-center gap-1.5 flex-wrap">
-                    {scrim.serverLocations.map((city) => {
-                      const loc = SERVER_LOCATION_MAP[city];
-                      return (
-                        <span key={city} className="inline-flex items-center gap-1">
-                          {loc && <FlagIcon country={loc.country} size={14} />}
-                          <span>{city}</span>
-                        </span>
-                      );
-                    })}
-                  </span>
-                ) : (
-                  <span>{serverLabels[scrim.serverBy] || 'По договоренности'}</span>
-                )}
+        <CardContent className="space-y-6 p-6 sm:p-8">
+          {/* Key Attributes: 4 perfectly balanced, equal-height metric tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+              <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
+                <span>Формат</span>
+                <Swords className="w-3.5 h-3.5 text-neutral-400" />
               </div>
+              <p className="font-mono font-black text-white text-base mt-2">{scrim.format}</p>
             </div>
 
-            <div className="p-3 rounded-lg border border-border bg-cs-panel space-y-1">
-              <span className="text-muted-foreground uppercase">Уровень</span>
-              <p className="font-bold text-foreground text-sm">{scrim.level || 'Любой'}</p>
+            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+              <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
+                <span>Платформа</span>
+                <Gamepad2 className="w-3.5 h-3.5 text-neutral-400" />
+              </div>
+              <p className="font-mono font-bold text-white text-base mt-2 truncate">
+                {platformLabels[scrim.platform || 'CYBERSHOCK'] || scrim.platform || 'Cybershock'}
+              </p>
             </div>
 
-            <div className="p-3 rounded-lg border border-border bg-cs-panel space-y-1">
-              <span className="text-muted-foreground uppercase">Откликов</span>
-              <p className="font-bold text-white text-sm">{scrim.responses.length}</p>
+            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+              <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
+                <span>Уровень</span>
+                <Crosshair className="w-3.5 h-3.5 text-neutral-400" />
+              </div>
+              <p className="font-mono font-bold text-white text-base mt-2 truncate">{scrim.level || 'Любой'}</p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+              <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
+                <span>Откликов</span>
+                <MessageSquare className="w-3.5 h-3.5 text-neutral-400" />
+              </div>
+              <p className="font-mono font-black text-white text-base mt-2">{scrim.responses.length}</p>
+            </div>
+          </div>
+
+          {/* Dedicated Server Locations Section (Horizontal Tag Bar) */}
+          <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
+                <Globe className="w-4 h-4 text-white" />
+                <span>Локации серверов</span>
+              </div>
+              <span className="text-[11px] font-mono text-muted-foreground">
+                {scrim.serverLocations && scrim.serverLocations.length > 0
+                  ? `Выбрано: ${scrim.serverLocations.length}`
+                  : 'По договоренности'}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-0.5">
+              {scrim.serverLocations && scrim.serverLocations.length > 0 ? (
+                scrim.serverLocations.map((city) => {
+                  const loc = SERVER_LOCATION_MAP[city];
+                  return (
+                    <div
+                      key={city}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-xs font-medium text-neutral-200 hover:border-neutral-500 transition-colors shadow-sm"
+                    >
+                      {loc && <FlagIcon country={loc.country} size={16} />}
+                      <span>{city}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-xs font-medium text-neutral-300 font-mono">
+                  <span>🤝 {serverLabels[scrim.serverBy] || 'По договоренности'}</span>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Slots List */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-white" />
+          <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
+              <Clock className="w-4 h-4 text-white" />
               <span>Предложенные слоты ({scrim.slots.length})</span>
-            </h3>
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {scrim.slots.map((s) => {
                 const { dateStr, timeStr, relativeStr } = formatSlotDateTime(s.startsAt, userTimezone);
                 return (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-cs-panel text-xs font-mono"
+                    className="flex items-center justify-between p-3.5 rounded-lg border border-neutral-800 bg-neutral-900/90 text-xs font-mono hover:border-neutral-700 transition-colors"
                   >
-                    <div>
-                      <span className="font-bold text-foreground">{dateStr}</span> в{' '}
-                      <span className="font-bold text-white">{timeStr}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-sm">{dateStr}</span>
+                      <span className="text-neutral-500">в</span>
+                      <span className="font-black text-white text-sm px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700">
+                        {timeStr}
+                      </span>
                     </div>
-                    <span className="text-muted-foreground">{relativeStr}</span>
+                    <span className="text-[11px] font-semibold text-neutral-400 bg-neutral-800/60 px-2 py-1 rounded">
+                      {relativeStr}
+                    </span>
                   </div>
                 );
               })}
@@ -447,18 +505,19 @@ export default function ScrimDetailPage() {
 
           {/* Excluded Maps */}
           {scrim.excludedMaps.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
-                <Ban className="w-3.5 h-3.5 text-rose-400" />
-                <span>Исключенные организатором карты</span>
-              </h3>
+            <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-2.5">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
+                <Ban className="w-4 h-4 text-rose-400" />
+                <span>Исключенные организатором карты ({scrim.excludedMaps.length})</span>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {scrim.excludedMaps.map((map) => (
                   <span
                     key={map}
-                    className="px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/20 text-xs font-mono"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/30 text-xs font-mono font-bold uppercase tracking-wider"
                   >
-                    {map.replace('de_', '')}
+                    <Ban className="w-3 h-3 text-rose-400" />
+                    <span>{map.replace('de_', '')}</span>
                   </span>
                 ))}
               </div>
@@ -467,9 +526,14 @@ export default function ScrimDetailPage() {
 
           {/* Comment */}
           {scrim.comment && (
-            <div className="space-y-1 p-3 rounded-lg border border-border/40 bg-cs-panel/20 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Комментарий организатора:</span>
-              <p className="italic">«{scrim.comment}»</p>
+            <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
+                <Quote className="w-3.5 h-3.5 text-neutral-400" />
+                <span>Комментарий организатора</span>
+              </div>
+              <p className="text-sm text-neutral-200 italic pl-4 border-l-2 border-neutral-700">
+                «{scrim.comment}»
+              </p>
             </div>
           )}
         </CardContent>
@@ -484,7 +548,7 @@ export default function ScrimDetailPage() {
           </h2>
 
           {scrim.responses.length === 0 ? (
-            <div className="p-8 text-center rounded-xl border border-border bg-card shadow-xl text-muted-foreground text-sm">
+            <div className="p-8 text-center rounded-2xl border border-neutral-800 bg-neutral-950/70 shadow-2xl text-muted-foreground text-sm font-mono">
               Пока нет откликов от соперников. Ссылка на заявку активна в ленте.
             </div>
           ) : (
@@ -503,18 +567,18 @@ export default function ScrimDetailPage() {
                 return (
                   <div
                     key={resp.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card shadow-xl shadow-black/40 hover:border-white/50 transition-all"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border border-neutral-800 bg-neutral-950/70 shadow-xl shadow-black/40 hover:border-neutral-700 transition-all"
                   >
                     {/* Responding Team info */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3.5">
                       <Link href={`/teams/${resp.team.id}`}>
-                        <div className="relative w-10 h-10 rounded-lg bg-cs-panel border border-border flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="relative w-12 h-12 rounded-xl bg-neutral-900 border border-neutral-700 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
                           {resp.team.logoUrl ? (
                             <Image
                               src={resp.team.logoUrl}
                               alt={resp.team.name}
-                              width={40}
-                              height={40}
+                              width={48}
+                              height={48}
                               className="object-cover w-full h-full"
                               unoptimized
                             />
@@ -530,17 +594,17 @@ export default function ScrimDetailPage() {
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/teams/${resp.team.id}`}
-                            className="font-bold text-foreground hover:text-white transition-colors"
+                            className="font-bold text-base text-foreground hover:text-white transition-colors"
                           >
                             {resp.team.name}
                           </Link>
-                          <span className="text-xs font-mono font-bold text-neutral-400">
+                          <span className="text-xs font-mono font-bold text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
                             [{resp.team.tag}]
                           </span>
                         </div>
-                        <p className="text-xs font-mono text-muted-foreground">{slotInfo}</p>
+                        <p className="text-xs font-mono text-neutral-300 mt-0.5">{slotInfo}</p>
                         {resp.message && (
-                          <p className="text-xs text-muted-foreground/80 italic mt-0.5">
+                          <p className="text-xs text-neutral-400 italic mt-0.5">
                             «{resp.message}»
                           </p>
                         )}
@@ -548,7 +612,7 @@ export default function ScrimDetailPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {isPending && scrim.status === 'OPEN' ? (
                         <>
                           <Button
@@ -566,7 +630,7 @@ export default function ScrimDetailPage() {
                             size="sm"
                             disabled={actionLoading === resp.id}
                             onClick={() => handleDeclineResponse(resp.id)}
-                            className="text-xs text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40"
+                            className="text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 hover:border-rose-500/60"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             <span>Отклонить</span>
@@ -596,17 +660,17 @@ export default function ScrimDetailPage() {
 
       {/* Opponent View: Respond to Scrim Form */}
       {!scrim.isAuthor && scrim.status === 'OPEN' && (
-        <Card className="border border-border bg-card shadow-xl shadow-black/40">
-          <CardHeader className="pb-3">
+        <Card className="border border-neutral-800 bg-neutral-950/70 shadow-2xl shadow-black/60 rounded-2xl">
+          <CardHeader className="pb-3 border-b border-neutral-800/80">
             <CardTitle className="text-lg flex items-center gap-2">
               <Send className="w-4 h-4 text-white" />
               <span>Откликнуться на прак</span>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Выберите свою команду и слот, чтобы предложить матч организатору.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-5">
             {!user ? (
               <div className="py-4 text-center space-y-3">
                 <p className="text-xs text-muted-foreground">Войдите через Steam, чтобы отправить отклик.</p>
@@ -625,13 +689,13 @@ export default function ScrimDetailPage() {
               <form onSubmit={handleSendResponse} className="space-y-4">
                 {/* Team selector */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
                     От имени какой команды:
                   </label>
                   <select
                     value={selectedTeamId}
                     onChange={(e) => setSelectedTeamId(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-border bg-cs-panel px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer font-bold"
+                    className="flex h-10 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer font-bold"
                   >
                     {user.teams.map((t) => (
                       <option key={t.id} value={t.id} className="bg-neutral-900">
@@ -643,7 +707,7 @@ export default function ScrimDetailPage() {
 
                 {/* Slot choice */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between text-xs font-mono">
                     <span className="font-semibold uppercase tracking-wider text-muted-foreground">
                       Выбор времени встречи:
                     </span>
@@ -657,16 +721,16 @@ export default function ScrimDetailPage() {
                   </div>
 
                   {!proposeCustomTime ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {scrim.slots.map((s) => {
                         const { dateStr, timeStr } = formatSlotDateTime(s.startsAt, userTimezone);
                         return (
                           <label
                             key={s.id}
-                            className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-all ${
+                            className={`flex items-center gap-2.5 p-3.5 rounded-xl border cursor-pointer transition-all ${
                               selectedSlotId === s.id
-                                ? 'border-white bg-white/10 text-foreground'
-                                : 'border-border bg-cs-panel text-muted-foreground hover:text-foreground'
+                                ? 'border-white bg-white/10 text-foreground ring-1 ring-white/20'
+                                : 'border-neutral-800 bg-neutral-900/60 text-muted-foreground hover:text-foreground hover:border-neutral-700'
                             }`}
                           >
                             <input
@@ -684,19 +748,19 @@ export default function ScrimDetailPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-cs-panel">
+                    <div className="flex items-center gap-2 p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60">
                       <input
                         type="date"
                         value={customDate}
                         onChange={(e) => setCustomDate(e.target.value)}
-                        className="h-9 px-3 rounded-md bg-card border border-border text-xs text-foreground"
+                        className="h-9 px-3 rounded-md bg-neutral-900 border border-neutral-700 text-xs text-foreground"
                         required
                       />
                       <input
                         type="time"
                         value={customTime}
                         onChange={(e) => setCustomTime(e.target.value)}
-                        className="h-9 px-3 rounded-md bg-card border border-border text-xs text-foreground font-mono font-bold"
+                        className="h-9 px-3 rounded-md bg-neutral-900 border border-neutral-700 text-xs text-foreground font-mono font-bold"
                         required
                       />
                     </div>
