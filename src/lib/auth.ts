@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import type { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyUserToken } from '@/lib/jwt';
 import { SafeUser } from '@/types';
@@ -8,6 +9,31 @@ export const AUTH_COOKIE_NAME = 'cs2_session';
 export const NONCE_COOKIE_NAME = 'cs2_steam_nonce';
 export const AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 export const NONCE_COOKIE_MAX_AGE = 10 * 60; // 10 minutes in seconds
+
+export function getRequestBaseUrl(request: NextRequest): string {
+  // 1. Check proxy forwarding headers (Render, Vercel, Cloudflare, etc.)
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (forwardedHost) {
+    const proto = (forwardedProto || 'https').split(',')[0].trim();
+    return `${proto}://${forwardedHost.split(',')[0].trim()}`;
+  }
+
+  // 2. Check Host header
+  const host = request.headers.get('host');
+  if (host) {
+    const proto = request.nextUrl.protocol ? request.nextUrl.protocol.replace(':', '') : 'http';
+    return `${proto}://${host}`;
+  }
+
+  // 3. Fallback to nextUrl origin
+  if (request.nextUrl.origin && request.nextUrl.origin !== 'null') {
+    return request.nextUrl.origin;
+  }
+
+  // 4. Fallback to environment variable or localhost
+  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
 
 export function toSafeUser(user: User): SafeUser {
   return {

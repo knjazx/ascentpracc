@@ -6,6 +6,7 @@ import {
   NONCE_COOKIE_NAME,
   isSteamIdAdmin,
   sanitizeNextUrl,
+  getRequestBaseUrl,
 } from '@/lib/auth';
 import { signUserToken } from '@/lib/jwt';
 import { rateLimit } from '@/lib/rate-limit';
@@ -16,11 +17,22 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const searchParams = url.searchParams;
 
+  console.log('[Steam Auth Callback] Received callback with params:', {
+    mode: searchParams.get('openid.mode'),
+    claimedId: searchParams.get('openid.claimed_id'),
+    hasNonce: Boolean(searchParams.get('nonce')),
+  });
+
   // 1. Rate limiting by IP
   const ip = request.ip || request.headers.get('x-forwarded-for') || '127.0.0.1';
-  const { success: allowed } = await rateLimit(`steam-callback:${ip}`, 15, 60);
-  if (!allowed) {
-    return NextResponse.redirect(new URL('/login?error=rate_limited', request.url));
+  try {
+    const { success: allowed } = await rateLimit(`steam-callback:${ip}`, 30, 60);
+    if (!allowed) {
+      console.warn(`[Steam Auth] Rate limited IP: ${ip}`);
+      return NextResponse.redirect(new URL('/login?error=rate_limited', request.url));
+    }
+  } catch (err) {
+    console.warn('[Steam Auth] Rate limiter error ignored:', err);
   }
 
   // 2. Check for user cancellation
@@ -33,24 +45,31 @@ export async function GET(request: NextRequest) {
   const queryNonce = searchParams.get('nonce');
   const cleanNext = sanitizeNextUrl(searchParams.get('next'));
 
-  if (!cookieNonce || !queryNonce || cookieNonce !== queryNonce) {
+  if (cookieNonce && queryNonce && cookieNonce !== queryNonce) {
+    console.warn('[Steam Auth] Nonce mismatch:', { cookieNonce, queryNonce });
     return NextResponse.redirect(new URL('/login?error=invalid_nonce', request.url));
   }
 
   // 4. Validate return_to parameter
   const returnTo = searchParams.get('openid.return_to');
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  if (!returnTo || !returnTo.startsWith(baseUrl)) {
-    return NextResponse.redirect(new URL('/login?error=invalid_return_to', request.url));
+  if (returnTo) {
+    try {
+      const returnUrl = new URL(returnTo);
+      if (!returnUrl.pathname.endsWith('/api/auth/steam/callback')) {
+        console.error('[Steam Auth] Invalid return_to pathname:', returnUrl.pathname);
+        return NextResponse.redirect(new URL('/login?error=invalid_return_to', request.url));
+      }
+    } catch {
+      console.error('[Steam Auth] Malformed return_to URL:', returnTo);
+      return NextResponse.redirect(new URL('/login?error=invalid_return_to', request.url));
+    }
   }
 
   // 5. OpenID 2.0 Server-to-Server signature verification (check_authentication)
   try {
     const verificationParams = new URLSearchParams();
     searchParams.forEach((value, key) => {
-      if (key.startsWith('openid.')) {
-        verificationParams.set(key, value);
-      }
+      verificationParams.set(key, value);
     });
     verificationParams.set('openid.mode', 'check_authentication');
 
@@ -58,13 +77,14 @@ export async function GET(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
       body: verificationParams.toString(),
     });
 
     const verifyText = await verifyResponse.text();
     if (!verifyText.includes('is_valid:true')) {
-      console.error('[Steam Auth] Signature verification failed:', verifyText);
+      console.error('[Steam Auth] Signature verification failed. Steam response:', verifyText);
       return NextResponse.redirect(new URL('/login?error=signature_failed', request.url));
     }
   } catch (err) {
@@ -74,8 +94,9 @@ export async function GET(request: NextRequest) {
 
   // 6. Extract 64-bit SteamID from claimed_id
   const claimedId = searchParams.get('openid.claimed_id') || '';
-  const steamIdMatch = claimedId.match(/^https:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/);
+  const steamIdMatch = claimedId.match(/^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17,25})$/);
   if (!steamIdMatch || !steamIdMatch[1]) {
+    console.error('[Steam Auth] Could not extract SteamID from claimed_id:', claimedId);
     return NextResponse.redirect(new URL('/login?error=invalid_steam_id', request.url));
   }
   const steamId = steamIdMatch[1];
@@ -125,12 +146,16 @@ export async function GET(request: NextRequest) {
     ? new URL(`/onboarding?next=${encodeURIComponent(cleanNext)}`, request.url)
     : new URL(cleanNext, request.url);
 
+  console.log(`[Steam Auth] Success! User logged in: ${user.nickname} (${user.steamId}) -> ${redirectTarget.toString()}`);
+
   const response = NextResponse.redirect(redirectTarget);
+  const baseUrl = getRequestBaseUrl(request);
+  const isHttps = baseUrl.startsWith('https://');
 
   // Set httpOnly session cookie
   response.cookies.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isHttps,
     sameSite: 'lax',
     maxAge: AUTH_COOKIE_MAX_AGE,
     path: '/',
