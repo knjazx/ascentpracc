@@ -109,17 +109,3 @@ export function FlagIcon({ country, className = '', size = 20 }: FlagIconProps) 
     </svg>
   );
 }
-
-export function SignalPingIcon({ ping, className = '' }: { ping: number; className?: string }) {
-  const color = ping < 30 ? 'text-emerald-400' : ping < 50 ? 'text-green-400' : 'text-amber-400';
-  return (
-    <div className={`inline-flex items-center gap-1.5 font-mono text-xs font-semibold ${color} ${className}`}>
-      <svg width="14" height="12" viewBox="0 0 14 12" fill="currentColor" className="shrink-0">
-        <rect x="1" y="8" width="2.5" height="4" rx="0.75" />
-        <rect x="5.5" y="4" width="2.5" height="8" rx="0.75" />
-        <rect x="10" y="1" width="2.5" height="11" rx="0.75" />
-      </svg>
-      <span>{ping}</span>
-    </div>
-  );
-}

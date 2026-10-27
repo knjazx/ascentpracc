@@ -23,7 +23,7 @@ import {
   Handshake,
 } from 'lucide-react';
 import { SERVER_LOCATIONS } from '@/lib/constants/servers';
-import { FlagIcon, SignalPingIcon } from '@/components/ui/flag-icon';
+import { FlagIcon } from '@/components/ui/flag-icon';
 
 const PLATFORMS: Array<{ id: 'CYBERSHOCK' | 'XPLAY' | 'FASTCUP' | 'OTHER'; name: string }> = [
   { id: 'CYBERSHOCK', name: 'Cybershock' },
@@ -378,18 +378,15 @@ export default function CreateScrimPage() {
                         </span>
                       </div>
 
-                      {/* Right: Ping with signal bars + Checkbox */}
-                      <div className="flex items-center gap-2.5">
-                        <SignalPingIcon ping={loc.ping} />
-                        <div
-                          className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                            isChecked
-                              ? 'bg-white border-white text-black'
-                              : 'border-neutral-600 bg-neutral-900/80'
-                          }`}
-                        >
-                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
+                      {/* Right: Checkbox */}
+                      <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                          isChecked
+                            ? 'bg-white border-white text-black'
+                            : 'border-neutral-600 bg-neutral-900/80'
+                        }`}
+                      >
+                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
                     </div>
                   );

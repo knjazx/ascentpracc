@@ -84,7 +84,7 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
             <optgroup label="Локации серверов" className="bg-neutral-900 text-white font-bold">
               {SERVER_LOCATIONS.map((loc) => (
                 <option key={loc.id} value={loc.city} className="bg-neutral-900 text-neutral-200">
-                  {loc.flag} {loc.city} ({loc.ping} ms)
+                  {loc.flag} {loc.city}
                 </option>
               ))}
             </optgroup>
