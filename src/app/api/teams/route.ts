@@ -51,21 +51,28 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      teams: teams.map((team) => ({
-        ...team,
-        totalMatches: team._count.matchesAsTeamA + team._count.matchesAsTeamB,
-      })),
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+  return NextResponse.json(
+    {
+      success: true,
+      data: {
+        teams: teams.map((team) => ({
+          ...team,
+          totalMatches: team._count.matchesAsTeamA + team._count.matchesAsTeamB,
+        })),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
       },
     },
-  });
+    {
+      headers: {
+        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=15',
+      },
+    }
+  );
 }
 
 export async function POST(request: NextRequest) {

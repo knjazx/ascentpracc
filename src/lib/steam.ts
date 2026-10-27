@@ -20,7 +20,10 @@ export async function fetchSteamUserProfile(
   if (apiKey && apiKey !== 'DUMMY_STEAM_API_KEY_CHANGE_ME' && apiKey !== 'YOUR_STEAM_API_KEY_HERE') {
     try {
       const apiUrl = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${steamId}`;
-      const res = await fetch(apiUrl, { next: { revalidate: 0 } });
+      const res = await fetch(apiUrl, {
+        next: { revalidate: 0 },
+        signal: AbortSignal.timeout(2500),
+      });
       if (res.ok) {
         const data = await res.json();
         const player = data?.response?.players?.[0];
@@ -44,6 +47,7 @@ export async function fetchSteamUserProfile(
         'Accept': 'text/xml, application/xml, text/plain',
       },
       next: { revalidate: 0 },
+      signal: AbortSignal.timeout(2500),
     });
 
     if (res.ok) {

@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -77,7 +78,7 @@ export function sanitizeNextUrl(rawUrl: string | null | undefined): string {
   return rawUrl;
 }
 
-export async function getCurrentUser(): Promise<SafeUser | null> {
+export const getCurrentUser = cache(async (): Promise<SafeUser | null> => {
   try {
     const cookieStore = cookies();
     const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
@@ -95,7 +96,7 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
     let attempts = 0;
 
     // Retry loop with short backoff to seamlessly handle database cold start / Neon wake up
-    while (attempts < 3) {
+    while (attempts < 2) {
       try {
         attempts++;
         if (payload.userId) {
@@ -114,10 +115,10 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
         break;
       } catch (dbError) {
         console.warn(`[getCurrentUser] Database query attempt ${attempts} failed:`, dbError);
-        if (attempts >= 3) {
+        if (attempts >= 2) {
           throw dbError;
         }
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 300));
       }
     }
 
@@ -139,4 +140,4 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
     console.error('Error fetching current user:', error);
     return null;
   }
-}
+});

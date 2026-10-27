@@ -4,7 +4,6 @@ import prisma from '@/lib/prisma';
 import { updateProfileSchema } from '@/lib/validations/user';
 import { signUserToken } from '@/lib/jwt';
 import { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE } from '@/lib/auth';
-import { fetchSteamUserProfile } from '@/lib/steam';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,26 +25,7 @@ export async function GET() {
       );
     }
 
-    let activeUser = user;
-
-    // Optional background refresh for newly registered fallback players if Steam API key is active
-    if (user.nickname.startsWith('Player_') && process.env.STEAM_API_KEY) {
-      try {
-        const { nickname, avatarUrl } = await fetchSteamUserProfile(
-          user.steamId,
-          process.env.STEAM_API_KEY
-        );
-        if (!nickname.startsWith('Player_')) {
-          const updated = await prisma.user.update({
-            where: { id: user.id },
-            data: { nickname, avatarUrl },
-          });
-          activeUser = toSafeUser(updated);
-        }
-      } catch (steamErr) {
-        console.warn('[API /me] Non-critical Steam profile update skipped:', steamErr);
-      }
-    }
+    const activeUser = user;
 
     // Safely query unread notifications count and user's managed teams
     let unreadNotifications = 0;

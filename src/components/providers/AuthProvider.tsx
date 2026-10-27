@@ -55,33 +55,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // If server returned 5xx or server is cold-starting right after deploy, retry gracefully
-      if (res.status >= 500 && retryCount < 3) {
-        console.warn(`[AuthProvider] Server busy or warming up (${res.status}), retrying in ${(retryCount + 1) * 1000}ms...`);
+      // If server returned 5xx (e.g. brief container restart), retry once quickly
+      if (res.status >= 500 && retryCount < 1) {
         retryTimeoutRef.current = setTimeout(() => {
           fetchSession(retryCount + 1);
-        }, (retryCount + 1) * 1000);
+        }, 500);
         return;
       }
 
-      // If 401 Unauthorized, verify that it wasn't a transient server error
+      // If 401 Unauthorized, session cookie is missing or invalid
       if (res.status === 401) {
         setUser(null);
       }
     } catch (err) {
       console.warn('[AuthProvider] Network error while fetching session:', err);
-      // If network failed (e.g. Render restart/deploy in progress), retry before giving up
-      if (retryCount < 3) {
+      if (retryCount < 1) {
         retryTimeoutRef.current = setTimeout(() => {
           fetchSession(retryCount + 1);
-        }, 1500);
+        }, 600);
         return;
       }
       setUser(null);
     } finally {
-      if (retryCount === 0 || retryCount >= 2) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, []);
 

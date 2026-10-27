@@ -87,18 +87,25 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        matches,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          matches,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+          },
         },
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=15',
+        },
+      }
+    );
   } catch (err: unknown) {
     console.error('Error in GET /api/matches:', err);
     return NextResponse.json(

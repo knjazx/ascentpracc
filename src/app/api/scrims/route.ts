@@ -104,21 +104,28 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      scrims: scrims.map((s) => ({
-        ...s,
-        responsesCount: s._count.responses,
-      })),
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+  return NextResponse.json(
+    {
+      success: true,
+      data: {
+        scrims: scrims.map((s) => ({
+          ...s,
+          responsesCount: s._count.responses,
+        })),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
       },
     },
-  });
+    {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=10',
+      },
+    }
+  );
 }
 
 export async function POST(request: NextRequest) {
