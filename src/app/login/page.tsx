@@ -84,40 +84,6 @@ function LoginContent() {
               <p className="text-[11px] text-center text-muted-foreground">
                 Авторизация безопасна и происходит напрямую на серверах valve steamcommunity.com
               </p>
-
-              {/* Quick Dev / Test Login */}
-              <div className="pt-2">
-                <div className="relative flex items-center justify-center my-2">
-                  <div className="border-t border-neutral-800 w-full" />
-                  <span className="bg-card px-2 text-[10px] text-muted-foreground uppercase font-mono tracking-wider">
-                    или быстрый тестовый вход
-                  </span>
-                  <div className="border-t border-neutral-800 w-full" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <a href={`/api/auth/dev-login?role=USER&next=${encodeURIComponent(next)}`} className="block">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs font-medium border-neutral-800 hover:bg-neutral-800 text-neutral-300"
-                    >
-                      👤 Капитан / Игрок
-                    </Button>
-                  </a>
-                  <a href={`/api/auth/dev-login?role=ADMIN&next=${encodeURIComponent(next)}`} className="block">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs font-medium border-neutral-800 hover:bg-neutral-800 text-amber-300 border-amber-500/20"
-                    >
-                      👑 Администратор
-                    </Button>
-                  </a>
-                </div>
-              </div>
             </div>
 
             {/* Platform Highlights */}
