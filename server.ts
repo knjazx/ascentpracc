@@ -64,6 +64,6 @@ app.prepare().then(async () => {
   (global as unknown as { io: SocketIOServer }).io = io;
 
   server.listen(port, () => {
-    console.log(`> CS2 Scrims Server ready on http://${hostname}:${port}`);
+    console.log(`> Ascent Pracc Server ready on http://${hostname}:${port}`);
   });
 });

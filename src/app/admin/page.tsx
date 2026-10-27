@@ -53,7 +53,7 @@ export default function AdminDashboardPage() {
       <div>
         <div className="flex items-center gap-2 text-white font-mono text-xs uppercase tracking-widest mb-1">
           <ShieldCheck className="w-4 h-4" />
-          <span>Панель управления судьи лиги</span>
+          <span>Панель управления Ascent Pracc</span>
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
           Администраторский центр

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { UserMenu } from '@/components/header/UserMenu';
 import { Button } from '@/components/ui/button';
@@ -40,21 +41,28 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between gap-4">
         {/* Brand / Logo */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-white text-black shadow-md group-hover:scale-105 transition-transform">
-              <Crosshair className="w-5 h-5 stroke-[2.5]" />
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-black border border-border shadow-md group-hover:scale-105 transition-transform overflow-hidden shrink-0">
+              <Image
+                src="/images/ascent-logo.png"
+                alt="Ascent Pracc"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+                priority
+              />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5 leading-none">
-                <span className="font-extrabold text-base tracking-wider uppercase text-white">
-                  CS2<span className="text-neutral-400">.SCRIMS</span>
+                <span className="font-black text-base tracking-wider uppercase text-white font-mono">
+                  ASCENT<span className="text-neutral-400">.PRACC</span>
                 </span>
                 <span className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/10 text-white border border-white/20 rounded">
-                  LEAGUE
+                  CS2
                 </span>
               </div>
               <span className="text-[10px] text-neutral-400 uppercase tracking-widest font-mono">
-                Prac & Scrim Portal
+                Competitive Portal
               </span>
             </div>
           </Link>

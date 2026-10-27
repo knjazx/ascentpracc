@@ -15,9 +15,13 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: 'CS2 Scrims & Practice League | Киберспортивные праки CS2',
+  title: 'Ascent Pracc | CS2 Scrims & Practice League',
   description:
-    'Платформа для поиска и проведения праков (скримов) по Counter-Strike 2. Интерактивное вето карт, живые лобби, автоматический подсчет результатов и рейтинговая лига.',
+    'Ascent Pracc — киберспортивная платформа для поиска и проведения праков (скримов) по Counter-Strike 2. Интерактивное вето карт, живые лобби, автоматический подсчет результатов и рейтинговая таблица.',
+  icons: {
+    icon: '/images/ascent-logo.png',
+    apple: '/images/ascent-logo.png',
+  },
 };
 
 export default function RootLayout({

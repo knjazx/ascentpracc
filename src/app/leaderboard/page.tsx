@@ -128,7 +128,7 @@ export default function LeaderboardPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5">
             <Trophy className="w-7 h-7 text-white" />
-            <span>Таблица лидеров CS2</span>
+            <span>Таблица лидеров Ascent Pracc</span>
           </h1>
           <p className="text-xs md:text-sm text-neutral-400 mt-1">
             Рейтинг команд по результатам сыгранных праков, статистика побед и репутация

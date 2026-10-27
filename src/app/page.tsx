@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ScrimCard, ScrimCardData } from '@/components/scrims/ScrimCard';
 import { ScrimFilters, FilterState } from '@/components/scrims/ScrimFilters';
@@ -72,38 +73,54 @@ export default function HomePage() {
   return (
     <div className="container py-8 space-y-8">
       {/* Hero Banner */}
-      <section className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900 via-neutral-950 to-black p-6 sm:p-10 shadow-2xl">
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 sm:p-10 shadow-2xl shadow-black/50">
         <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/5 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-white/5 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-2xl space-y-3 sm:space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs font-semibold text-neutral-200 font-mono">
-            <Zap className="h-3.5 w-3.5 text-white" />
-            <span>Сезон 2026 CS2 Праков открыт</span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="max-w-2xl space-y-3 sm:space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-cs-panel px-3 py-1 text-xs font-semibold text-neutral-200 font-mono">
+              <Zap className="h-3.5 w-3.5 text-white" />
+              <span>Платформа соревновательных праков CS2</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-white leading-tight font-mono">
+              ASCENT <span className="text-neutral-400">PRACC</span>
+            </h1>
+
+            <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+              Официальная лига и поиск праков (скримов) по Counter-Strike 2. Интерактивное вето карт, живые лобби, выбор серверов и подтверждение результатов.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link href="/scrims/new">
+                <Button variant="cs" size="lg" className="gap-2 text-sm font-bold tracking-wider">
+                  <Plus className="h-4 w-4 stroke-[3]" />
+                  <span>Создать заявку на прак</span>
+                </Button>
+              </Link>
+
+              <Link href="/teams">
+                <Button variant="outline" size="lg" className="gap-2 text-sm">
+                  <Users className="h-4 w-4" />
+                  <span>Каталог команд</span>
+                </Button>
+              </Link>
+            </div>
           </div>
 
-          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-white leading-tight">
-            Поиск и проведение <span className="text-neutral-400">праков CS2</span>
-          </h1>
-
-          <p className="text-sm sm:text-base text-neutral-400 leading-relaxed">
-            Откликайтесь на слоты других команд, проводите интерактивное вето карт в реальном времени и подтверждайте результаты матчей.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link href="/scrims/new">
-              <Button variant="cs" size="lg" className="gap-2 text-sm font-bold tracking-wider">
-                <Plus className="h-4 w-4 stroke-[3]" />
-                <span>Создать заявку на прак</span>
-              </Button>
-            </Link>
-
-            <Link href="/teams">
-              <Button variant="outline" size="lg" className="gap-2 text-sm">
-                <Users className="h-4 w-4" />
-                <span>Каталог команд</span>
-              </Button>
-            </Link>
+          {/* Big Ascent Logo in Hero */}
+          <div className="hidden md:flex items-center justify-center shrink-0 pr-4">
+            <div className="w-36 h-36 rounded-full bg-black border-2 border-border shadow-2xl shadow-black/80 flex items-center justify-center p-1 overflow-hidden">
+              <Image
+                src="/images/ascent-logo.png"
+                alt="Ascent Pracc"
+                width={140}
+                height={140}
+                className="w-full h-full object-cover rounded-full"
+                priority
+              />
+            </div>
           </div>
         </div>
       </section>

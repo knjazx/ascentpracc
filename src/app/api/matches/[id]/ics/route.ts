@@ -39,9 +39,9 @@ export async function GET(
       ? `Сервер: ${serverInfo.ip}:${serverInfo.port || 27015} (Пароль: ${serverInfo.password || 'нет'})`
       : 'Данные сервера будут предоставлены в лобби матча.';
 
-    const summary = `CS2 Scrim: [${match.teamA.tag}] vs [${match.teamB.tag}] (${match.format})`;
+    const summary = `Ascent Pracc: [${match.teamA.tag}] vs [${match.teamB.tag}] (${match.format})`;
     const description = [
-      `CS2 Практический матч: ${match.teamA.name} vs ${match.teamB.name}`,
+      `Ascent Pracc Матч: ${match.teamA.name} vs ${match.teamB.name}`,
       `Формат: ${match.format}`,
       serverDetails,
       `Лобби матча: /lobby/${match.id}`,
@@ -50,11 +50,11 @@ export async function GET(
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//CS2 Scrim League//Match Calendar//RU',
+      'PRODID:-//Ascent Pracc//Match Calendar//RU',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
-      `UID:match-${match.id}@cs2scrims.local`,
+      `UID:match-${match.id}@ascentpracc.com`,
       `DTSTAMP:${dtStamp}`,
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,

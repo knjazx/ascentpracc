@@ -13,7 +13,7 @@ import { processMatchReminder } from './processors/reminder-processor';
 import { processVetoTimeout } from './processors/veto-processor';
 
 console.log('--------------------------------------------------');
-console.log('   CS2 Scrim Platform - BullMQ Background Worker   ');
+console.log('   Ascent Pracc - BullMQ Background Worker   ');
 console.log('--------------------------------------------------');
 
 // 1. Scrim Worker (Expirations)

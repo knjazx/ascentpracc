@@ -3,6 +3,7 @@
 import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, Crosshair, ShieldCheck, Zap, Swords } from 'lucide-react';
@@ -49,11 +50,18 @@ function LoginContent() {
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-neutral-700 via-white to-neutral-700" />
 
           <CardHeader className="text-center pb-4 pt-8">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-black shadow-lg shadow-white/10 mb-3">
-              <Crosshair className="h-8 w-8 stroke-[2.5]" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-black border border-border shadow-lg shadow-black/50 mb-3 overflow-hidden p-0.5">
+              <Image
+                src="/images/ascent-logo.png"
+                alt="Ascent Pracc Logo"
+                width={64}
+                height={64}
+                className="w-full h-full object-cover rounded-full"
+                priority
+              />
             </div>
-            <CardTitle className="text-2xl font-black uppercase tracking-wider text-foreground">
-              Вход в лигу <span className="text-white">CS2</span>
+            <CardTitle className="text-2xl font-black uppercase tracking-wider text-foreground font-mono">
+              Вход в <span className="text-white">Ascent Pracc</span>
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm max-w-xs mx-auto">
               Авторизуйтесь через официальный Steam для управления командами, поиска скримов и участия в вето матчей.

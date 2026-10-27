@@ -32,14 +32,14 @@ export async function sendDiscordWebhook(
 
   try {
     const payload = {
-      username: 'CS2 Scrims Bot',
+      username: 'Ascent Pracc Bot',
       avatar_url: 'https://cdn-icons-png.flaticon.com/512/8065/8065074.png',
       content: content || undefined,
       embeds: [
         {
           ...embed,
           color: embed.color ?? 0xf59e0b, // Default Amber
-          footer: embed.footer || { text: 'CS2 Scrim League • Автоматическое уведомление' },
+          footer: embed.footer || { text: 'Ascent Pracc • Автоматическое уведомление' },
           timestamp: embed.timestamp || new Date().toISOString(),
         },
       ],

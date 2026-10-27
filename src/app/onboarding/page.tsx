@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { useUser } from '@/hooks/useUser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,11 +70,18 @@ function OnboardingContent() {
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-neutral-700 via-white to-neutral-700" />
 
         <CardHeader className="text-center pb-4 pt-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white border border-white/20 mb-3 shadow-lg shadow-white/5">
-            <Sparkles className="h-7 w-7" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-black border border-border shadow-lg shadow-black/50 mb-3 overflow-hidden p-0.5">
+            <Image
+              src="/images/ascent-logo.png"
+              alt="Ascent Pracc"
+              width={64}
+              height={64}
+              className="w-full h-full object-cover rounded-full"
+              priority
+            />
           </div>
-          <CardTitle className="text-2xl font-black uppercase tracking-wider text-foreground">
-            Добро пожаловать в лигу!
+          <CardTitle className="text-2xl font-black uppercase tracking-wider text-foreground font-mono">
+            Добро пожаловать в <span className="text-white">Ascent Pracc!</span>
           </CardTitle>
           <CardDescription className="text-muted-foreground text-sm max-w-sm mx-auto">
             Остался один быстрый шаг перед началом: мы автоматически настроили ваш часовой пояс по системе.

@@ -1,4 +1,4 @@
-# CS2 Scrims & Tournament Matchmaking Platform
+# Ascent Pracc — CS2 Scrims & Tournament Matchmaking Platform
 
 Полнофункциональная киберспортивная платформа для организации, поиска и проведения тренировочных матчей (праков / скримов) по Counter-Strike 2.
 
