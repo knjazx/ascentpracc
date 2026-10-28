@@ -10,6 +10,7 @@ import { socketAuthMiddleware, AuthenticatedSocket } from './src/lib/socket/auth
 import { registerMatchHandlers } from './src/lib/socket/match-handler';
 import { registerVetoHandlers } from './src/lib/socket/veto-handler';
 import { ensureDatabaseRunning } from './src/lib/db-server';
+import { prewarmServerCache } from './src/lib/prewarm';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);
@@ -32,6 +33,7 @@ const preparePromise = app
     }
     isNextReady = true;
     console.log(`> Next.js engine initialized successfully (${dev ? 'development' : 'production'})`);
+    prewarmServerCache().catch((err) => console.warn('> Prewarm error:', err));
   })
   .catch((err) => {
     prepareError = err;

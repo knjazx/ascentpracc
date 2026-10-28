@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { ScrimStatus, Role } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function GET(
   _request: NextRequest,
@@ -9,6 +10,12 @@ export async function GET(
 ) {
   const { id } = params;
   const user = await getCurrentUser();
+
+  const cacheKey = `scrim:detail:${id}:${user?.id || 'anon'}`;
+  const cached = memoryCache.get(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   const scrim = await prisma.scrimRequest.findUnique({
     where: { id },
@@ -63,6 +70,42 @@ export async function GET(
   const isAuthorManager =
     user && (scrim.team.managers.some((m) => m.userId === user.id) || user.role === Role.ADMIN);
 
+  // If this is a direct challenge, fetch target team and determine if current user is target manager
+  let targetTeam: {
+    id: string;
+    name: string;
+    tag: string;
+    logoUrl: string | null;
+    avgElo: number | null;
+    managers: Array<{ userId: string; isOwner: boolean }>;
+  } | null = null;
+  let isTargetManager = false;
+
+  if (scrim.level?.startsWith('CHALLENGE:')) {
+    const targetTeamId = scrim.level.replace('CHALLENGE:', '');
+    targetTeam = await prisma.team.findUnique({
+      where: { id: targetTeamId },
+      select: {
+        id: true,
+        name: true,
+        tag: true,
+        logoUrl: true,
+        avgElo: true,
+        managers: {
+          select: {
+            userId: true,
+            isOwner: true,
+          },
+        },
+      },
+    });
+
+    if (targetTeam && user) {
+      isTargetManager =
+        targetTeam.managers.some((m) => m.userId === user.id) || user.role === Role.ADMIN;
+    }
+  }
+
   // If author manager, include all responses.
   // Otherwise, include only responses from teams managed by current user.
   let responses: unknown[] = [];
@@ -111,14 +154,20 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({
+  const payload = {
     success: true,
     data: {
       ...scrim,
       isAuthor: Boolean(isAuthorManager),
+      targetTeam,
+      isTargetManager,
       responses,
     },
-  });
+  };
+
+  memoryCache.set(cacheKey, payload, 10);
+
+  return NextResponse.json(payload);
 }
 
 export async function DELETE(
@@ -155,9 +204,16 @@ export async function DELETE(
     );
   }
 
+  if (scrim.status === ScrimStatus.CANCELLED) {
+    memoryCache.invalidate('scrims:');
+    memoryCache.invalidate(`scrim:detail:${id}`);
+    memoryCache.invalidate('feed:');
+    return NextResponse.json({ success: true, message: 'Заявка уже отменена' });
+  }
+
   if (scrim.status !== ScrimStatus.OPEN) {
     return NextResponse.json(
-      { success: false, error: 'Нельзя отменить заявку, которая уже не является открытой' },
+      { success: false, error: 'Нельзя отменить заявку, которая находится в статусе ' + scrim.status },
       { status: 400 }
     );
   }
@@ -166,6 +222,10 @@ export async function DELETE(
     where: { id },
     data: { status: ScrimStatus.CANCELLED },
   });
+
+  memoryCache.invalidate('scrims:');
+  memoryCache.invalidate(`scrim:detail:${id}`);
+  memoryCache.invalidate('feed:');
 
   return NextResponse.json({ success: true, message: 'Заявка успешно отменена' });
 }

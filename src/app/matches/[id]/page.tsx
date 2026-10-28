@@ -9,6 +9,7 @@ import { Swords, Trophy, Calendar, ArrowLeft, ExternalLink, ShieldCheck, Star } 
 import Link from 'next/link';
 import { formatUtcToZoned } from '@/lib/date';
 import { useUser } from '@/hooks/useUser';
+import { getClientCache, setClientCache } from '@/lib/client-cache';
 
 interface MatchDetails {
   id: string;
@@ -61,22 +62,26 @@ interface MatchDetails {
 export default function MatchDetailPage() {
   const { id } = useParams() as { id: string };
   const { user } = useUser();
-  const [match, setMatch] = useState<MatchDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const cacheKey = `match:detail:${id}`;
+  const initialCache = getClientCache<MatchDetails>(cacheKey);
+
+  const [match, setMatch] = useState<MatchDetails | null>(initialCache);
+  const [loading, setLoading] = useState(!initialCache);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadMatch() {
       try {
-        setLoading(true);
-        // Use matches feed endpoint with teamId filter or public match query
-        const res = await fetch(`/api/matches?limit=1&search=&page=1`);
-        // Or directly fetch from /api/matches/[id]
+        if (!getClientCache(cacheKey)) {
+          setLoading(true);
+        }
         const directRes = await fetch(`/api/matches/${id}`);
         const data = await directRes.json();
 
         if (directRes.ok && data.success) {
           setMatch(data.data);
+          setClientCache(cacheKey, data.data);
         } else {
           // If user isn't participant, fallback to public matches query
           const fallbackRes = await fetch(`/api/matches`);
@@ -84,6 +89,7 @@ export default function MatchDetailPage() {
           const found = fbData.data?.matches?.find((m: MatchDetails) => m.id === id);
           if (found) {
             setMatch(found);
+            setClientCache(cacheKey, found);
           } else {
             setError(data.error || 'Матч не найден');
           }
@@ -96,7 +102,7 @@ export default function MatchDetailPage() {
     }
 
     if (id) loadMatch();
-  }, [id]);
+  }, [id, cacheKey]);
 
   if (loading) {
     return (

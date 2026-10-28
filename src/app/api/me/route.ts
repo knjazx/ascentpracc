@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { updateProfileSchema } from '@/lib/validations/user';
 import { signUserToken } from '@/lib/jwt';
 import { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE } from '@/lib/auth';
+import { memoryCache } from '@/lib/memory-cache';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -23,6 +24,12 @@ export async function GET() {
         { success: false, error: 'Unauthorized' },
         { status: 401, headers: NO_CACHE_HEADERS }
       );
+    }
+
+    const cacheKey = `user:me:${user.id}`;
+    const cached = memoryCache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached, { headers: NO_CACHE_HEADERS });
     }
 
     const activeUser = user;
@@ -59,20 +66,21 @@ export async function GET() {
       console.warn('[API /me] Could not load supplementary notifications/teams data:', dbErr);
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          ...activeUser,
-          unreadNotifications,
-          teams: managedTeams.map((tm) => ({
-            ...tm.team,
-            isOwner: tm.isOwner,
-          })),
-        },
+    const payload = {
+      success: true,
+      data: {
+        ...activeUser,
+        unreadNotifications,
+        teams: managedTeams.map((tm) => ({
+          ...tm.team,
+          isOwner: tm.isOwner,
+        })),
       },
-      { headers: NO_CACHE_HEADERS }
-    );
+    };
+
+    memoryCache.set(cacheKey, payload, 60);
+
+    return NextResponse.json(payload, { headers: NO_CACHE_HEADERS });
   } catch (err: unknown) {
     console.error('[API /me] Critical error processing GET /api/me:', err);
     return NextResponse.json(
@@ -108,6 +116,9 @@ export async function PATCH(request: NextRequest) {
       where: { id: currentUser.id },
       data: updateData,
     });
+
+    memoryCache.invalidate(`user:session:${currentUser.id}`);
+    memoryCache.invalidate(`user:me:${currentUser.id}`);
 
     // Re-sign JWT if onboarded status changed
     const newToken = await signUserToken({

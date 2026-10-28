@@ -32,8 +32,23 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = sessionStorage.getItem('ascent_user_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      return !sessionStorage.getItem('ascent_user_session');
+    } catch {
+      return true;
+    }
+  });
   const router = useRouter();
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -50,6 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         if (data.success && data.data) {
           setUser(data.data);
+          try {
+            sessionStorage.setItem('ascent_user_session', JSON.stringify(data.data));
+          } catch {}
           setLoading(false);
           return;
         }
@@ -66,6 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If 401 Unauthorized, session cookie is missing or invalid
       if (res.status === 401) {
         setUser(null);
+        try {
+          sessionStorage.removeItem('ascent_user_session');
+        } catch {}
       }
     } catch (err) {
       console.warn('[AuthProvider] Network error while fetching session:', err);
@@ -95,6 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
+      try {
+        sessionStorage.removeItem('ascent_user_session');
+      } catch {}
       router.push('/login');
       router.refresh();
     } catch (err) {

@@ -20,14 +20,15 @@ import {
 import { SideChoice } from '@prisma/client';
 
 const MAP_DISPLAY_NAMES: Record<string, string> = {
+  de_dust2: 'Dust2',
   de_mirage: 'Mirage',
-  de_inferno: 'Inferno',
   de_nuke: 'Nuke',
   de_ancient: 'Ancient',
+  de_inferno: 'Inferno',
   de_anubis: 'Anubis',
-  de_dust2: 'Dust II',
-  de_overpass: 'Overpass',
+  de_cache: 'Cache',
   de_vertigo: 'Vertigo',
+  de_overpass: 'Overpass',
   de_train: 'Train',
 };
 
@@ -39,8 +40,9 @@ const MAP_THEMES: Record<string, string> = {
   de_ancient: 'from-neutral-900 via-neutral-950 to-black',
   de_anubis: 'from-neutral-900 via-neutral-950 to-black',
   de_dust2: 'from-neutral-900 via-neutral-950 to-black',
-  de_overpass: 'from-neutral-900 via-neutral-950 to-black',
+  de_cache: 'from-neutral-900 via-neutral-950 to-black',
   de_vertigo: 'from-neutral-900 via-neutral-950 to-black',
+  de_overpass: 'from-neutral-900 via-neutral-950 to-black',
   de_train: 'from-neutral-900 via-neutral-950 to-black',
 };
 
@@ -181,18 +183,18 @@ export function VetoBoard({
   const timerPercent = Math.min(100, Math.max(0, (secondsLeft / 60) * 100));
 
   return (
-    <Card className="border border-border bg-card overflow-hidden shadow-2xl shadow-black/40 relative">
+    <Card className="border border-[#222222] bg-[#111111] overflow-hidden shadow-2xl relative rounded-xl">
       {/* Top Banner: Status & Turn Indicator */}
-      <div className="p-4 sm:p-5 border-b border-border bg-cs-panel">
+      <div className="p-4 sm:p-5 border-b border-[#222222] bg-[#0a0a0a]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 border border-white/20 text-white font-mono font-black text-sm">
+            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#111111] border border-[#222222] text-white font-mono font-black text-sm">
               #{vetoState.currentStepIndex + 1}
             </div>
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold uppercase font-mono text-foreground">
+                <span className="text-sm font-bold uppercase font-mono text-white">
                   {vetoState.isFinished
                     ? 'Вето карт завершено'
                     : `Ход команды [${activeTeamTag}]`}
@@ -204,7 +206,7 @@ export function VetoBoard({
                 )}
               </div>
 
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-xs text-[#a1a1aa] mt-0.5">
                 {vetoState.isFinished ? (
                   <span className="text-white font-semibold">
                     Карты утверждены. Сервер готов к старту матча.
@@ -234,7 +236,7 @@ export function VetoBoard({
               <Clock className="w-4 h-4 text-white" />
               <span
                 className={`font-mono font-black text-base ${
-                  secondsLeft <= 10 ? 'text-rose-400 animate-pulse' : 'text-white'
+                  secondsLeft <= 10 ? 'text-[#ef4444] animate-pulse' : 'text-white'
                 }`}
               >
                 {secondsLeft}с
@@ -245,11 +247,11 @@ export function VetoBoard({
 
         {/* Animated Timer Bar */}
         {!vetoState.isFinished && (
-          <div className="h-1.5 w-full bg-neutral-950 rounded-full overflow-hidden mt-3">
+          <div className="h-1.5 w-full bg-[#1a1a1a] rounded-full overflow-hidden mt-3">
             <div
               className={`h-full transition-all duration-500 ${
                 secondsLeft <= 10
-                  ? 'bg-rose-500'
+                  ? 'bg-[#ef4444]'
                   : 'bg-white'
               }`}
               style={{ width: `${timerPercent}%` }}
@@ -259,18 +261,18 @@ export function VetoBoard({
       </div>
 
       {error && (
-        <div className="m-4 flex items-center gap-2 p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div className="m-4 flex items-center gap-2 p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 text-xs">
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Side selection prompt if action is SIDE */}
       {!vetoState.isFinished && vetoState.currentActionType === 'SIDE' && (
-        <div className="p-6 bg-gradient-to-br from-neutral-950 to-black border-b border-neutral-800 text-center space-y-4 animate-in fade-in">
-          <h4 className="text-sm font-bold uppercase font-mono tracking-wider text-foreground">
+        <div className="p-6 bg-[#0a0a0a] border-b border-[#222222] text-center space-y-4 animate-in fade-in">
+          <h4 className="text-sm font-bold uppercase font-mono tracking-wider text-white">
             Команда [{activeTeamTag}], выберите начальную сторону на карте{' '}
-            <span className="text-white font-black">
+            <span className="text-white font-black underline underline-offset-4">
               {MAP_DISPLAY_NAMES[vetoState.currentTargetMap || ''] || vetoState.currentTargetMap}
             </span>
           </h4>
@@ -282,7 +284,7 @@ export function VetoBoard({
                 size="lg"
                 disabled={submitting}
                 onClick={() => handleAction(undefined, SideChoice.CT)}
-                className="flex-1 border-neutral-700 text-white hover:bg-white/10 font-black font-mono uppercase text-base h-12 shadow-lg"
+                className="flex-1 border-[#222222] text-white hover:bg-white hover:text-black font-black font-mono uppercase text-base h-12 shadow-sm"
               >
                 Начать за CT
               </Button>
@@ -291,13 +293,13 @@ export function VetoBoard({
                 size="lg"
                 disabled={submitting}
                 onClick={() => handleAction(undefined, SideChoice.T)}
-                className="flex-1 border-neutral-700 text-white hover:bg-white/10 font-black font-mono uppercase text-base h-12 shadow-lg"
+                className="flex-1 border-[#222222] text-white hover:bg-white hover:text-black font-black font-mono uppercase text-base h-12 shadow-sm"
               >
                 Начать за T
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground animate-pulse font-mono">
+            <p className="text-xs text-[#a1a1aa] animate-pulse font-mono">
               Ожидание выбора стороны соперником...
             </p>
           )}
@@ -328,44 +330,67 @@ export function VetoBoard({
                 <div
                   key={mapName}
                   onClick={() => canClickMap && handleAction(mapName)}
-                  className={`relative rounded-xl border p-4 min-h-[110px] flex flex-col justify-between overflow-hidden transition-all duration-200 select-none ${
+                  className={`group relative rounded-xl border p-2 flex flex-col justify-between overflow-hidden transition-all duration-200 select-none ${
                     isBanned
-                      ? 'border-border/50 bg-cs-panel/40 opacity-40 grayscale'
+                      ? 'border-red-500/60 bg-red-950/25 opacity-50 grayscale'
                       : isPicked
-                      ? 'border-white/60 bg-white/10 shadow-lg shadow-white/5'
+                      ? 'border-white bg-[#222222] shadow-md'
                       : canClickMap
-                      ? 'border-border bg-cs-panel hover:border-white hover:scale-[1.02] cursor-pointer shadow-md'
-                      : 'border-border/60 bg-cs-panel/60 opacity-80'
+                      ? 'border-[#333333] bg-[#181818] hover:border-white hover:bg-[#202020] hover:scale-[1.02] cursor-pointer shadow-sm'
+                      : 'border-[#333333] bg-[#181818] opacity-80'
                   }`}
                 >
-                  {/* Map Name & Order Badge */}
-                  <div className="flex items-start justify-between gap-1">
-                    <span className="font-black text-sm uppercase font-mono tracking-wider text-foreground">
+                  {/* Map Thumbnail Image */}
+                  <div className="relative w-full aspect-[3/2] overflow-hidden rounded-lg border border-white/10">
+                    <img
+                      src={`/maps/${mapName}.webp`}
+                      alt={displayName}
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    {isBanned && (
+                      <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                        <Ban className="w-6 h-6 text-red-500 stroke-[2.5]" />
+                        <span className="text-[10px] font-mono font-black text-red-300 uppercase tracking-wider">
+                          БАН
+                        </span>
+                      </div>
+                    )}
+                    {isPicked && pickedData && (
+                      <div className="absolute top-1.5 right-1.5">
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white text-black shadow">
+                          Карта #{pickedData.order}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Map Name */}
+                  <div className="mt-2 text-center">
+                    <span className="font-bold text-xs uppercase font-mono tracking-wider text-white">
                       {displayName}
                     </span>
-
-                    {isPicked && pickedData && (
-                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/20 text-white border border-white/30">
-                        Карта #{pickedData.order}
-                      </span>
-                    )}
                   </div>
 
                   {/* Status Overlay / CTA */}
                   <div className="pt-2">
                     {isBanned ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-neutral-500">
-                        <Ban className="w-3.5 h-3.5" />
-                        БАН
-                      </span>
+                      <div className="text-center">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#52525b]">
+                          <Ban className="w-3.5 h-3.5 text-[#ef4444]" />
+                          БАН
+                        </span>
+                      </div>
                     ) : isPicked && pickedData ? (
                       <div className="flex items-center justify-between text-[11px] font-mono">
                         <span className="inline-flex items-center gap-1 text-white font-bold">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                           ПИКНУТА
                         </span>
                         {pickedData.startSideA && (
-                          <span className="text-[10px] text-muted-foreground font-semibold">
+                          <span className="text-[10px] text-[#a1a1aa] font-semibold">
                             {teamA.tag}: {pickedData.startSideA}
                           </span>
                         )}
@@ -380,9 +405,11 @@ export function VetoBoard({
                         {vetoState.currentActionType === 'BAN' ? 'Забанить' : 'Пикнуть'}
                       </Button>
                     ) : (
-                      <span className="text-[11px] font-mono text-muted-foreground/70">
-                        Доступна
-                      </span>
+                      <div className="text-center">
+                        <span className="text-[11px] font-mono text-[#52525b]">
+                          Доступна
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>

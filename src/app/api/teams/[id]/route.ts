@@ -3,12 +3,20 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { teamUpdateSchema } from '@/lib/validations/team';
 import { MatchStatus, Role } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = params;
+  try {
+    const { id } = params;
+
+    const cacheKey = `team:detail:${id}`;
+    const cached = memoryCache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
 
   const team = await prisma.team.findUnique({
     where: { id },
@@ -28,11 +36,21 @@ export async function GET(
       },
       ratingsReceived: {
         select: {
+          id: true,
           punctuality: true,
           sportsmanship: true,
           comment: true,
           createdAt: true,
+          byTeam: {
+            select: {
+              id: true,
+              name: true,
+              tag: true,
+              logoUrl: true,
+            },
+          },
         },
+        orderBy: { createdAt: 'desc' },
       },
       matchesAsTeamA: {
         where: { status: { in: [MatchStatus.CONFIRMED, MatchStatus.DISPUTED] } },
@@ -59,10 +77,10 @@ export async function GET(
     return NextResponse.json({ success: false, error: 'Команда не найдена' }, { status: 404 });
   }
 
-  // Calculate average ratings
+  // Calculate average ratings (defaults to 0.0 if no ratings yet)
   const ratings = team.ratingsReceived;
-  let avgPunctuality = 5.0;
-  let avgSportsmanship = 5.0;
+  let avgPunctuality = 0.0;
+  let avgSportsmanship = 0.0;
 
   if (ratings.length > 0) {
     avgPunctuality = Number(
@@ -72,6 +90,18 @@ export async function GET(
       (ratings.reduce((acc, r) => acc + r.sportsmanship, 0) / ratings.length).toFixed(1)
     );
   }
+
+  // Calculate Trust Factor based on active reports & no-shows
+  const activeReportsCount = await prisma.report.count({
+    where: {
+      targetType: 'TEAM',
+      targetId: id,
+      status: { in: ['PENDING', 'REVIEWED', 'RESOLVED'] },
+    },
+  });
+
+  const penalty = (team.noShowCount * 20) + (activeReportsCount * 15);
+  const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
 
   // Combine and sort recent matches
   const recentMatches = [
@@ -99,16 +129,26 @@ export async function GET(
     .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
     .slice(0, 10);
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      ...team,
-      avgPunctuality,
-      avgSportsmanship,
-      ratingCount: ratings.length,
-      recentMatches,
-    },
-  });
+    const payload = {
+      success: true,
+      data: {
+        ...team,
+        avgPunctuality,
+        avgSportsmanship,
+        ratingCount: ratings.length,
+        trustFactor,
+        activeReportsCount,
+        recentMatches,
+      },
+    };
+
+    memoryCache.set(cacheKey, payload, 60);
+
+    return NextResponse.json(payload);
+  } catch (err: unknown) {
+    console.error('Error loading team:', err);
+    return NextResponse.json({ success: false, error: 'Ошибка загрузки команды' }, { status: 500 });
+  }
 }
 
 export async function PATCH(
@@ -121,6 +161,8 @@ export async function PATCH(
   }
 
   const { id } = params;
+  memoryCache.invalidate(`team:detail:${id}`);
+  memoryCache.invalidate('teams:');
 
   // Check user permissions
   const managerRecord = await prisma.teamManager.findUnique({
@@ -228,6 +270,10 @@ export async function DELETE(
   await prisma.team.delete({
     where: { id },
   });
+
+  memoryCache.invalidate(`team:detail:${id}`);
+  memoryCache.invalidate('teams:');
+  memoryCache.invalidate('leaderboard:');
 
   return NextResponse.json({ success: true, message: 'Команда успешно удалена' });
 }

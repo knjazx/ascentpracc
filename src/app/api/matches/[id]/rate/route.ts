@@ -4,10 +4,16 @@ import { getCurrentUser } from '@/lib/auth';
 import { z } from 'zod';
 import { MatchStatus } from '@prisma/client';
 
+import { memoryCache } from '@/lib/memory-cache';
+
 const rateSchema = z.object({
   punctuality: z.number().int().min(1).max(5),
   sportsmanship: z.number().int().min(1).max(5),
-  comment: z.string().max(500).optional().nullable(),
+  comment: z
+    .string({ required_error: 'Пожалуйста, опишите ситуацию в комментарии (обязательно)' })
+    .trim()
+    .min(5, 'Пожалуйста, подробно опишите ситуацию в комментарии (минимум 5 символов)')
+    .max(500, 'Комментарий не может превышать 500 символов'),
 });
 
 export async function POST(
@@ -94,6 +100,10 @@ export async function POST(
         },
       });
     }
+
+    memoryCache.invalidate(`team:detail:${ratedTeamId}`);
+    memoryCache.invalidate('teams:');
+    memoryCache.invalidate('leaderboard:');
 
     return NextResponse.json({
       success: true,

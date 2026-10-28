@@ -4,33 +4,54 @@
 
 @layer base {
   :root {
-    --background: 225 10% 16%; /* #24262d - выразительный киберспортивный серый фон */
-    --foreground: 0 0% 98%;
+    /* EFL Design System — Pure B&W Esports Palette */
+    --bg-color: #0a0a0a;
+    --bg-panel: #111111;
+    --bg-panel-hover: #1a1a1a;
+    --border-color: #222222;
+    --border-color-strong: #ffffff;
 
-    --card: 225 12% 7%; /* #101114 - глубокие контрастные непрозрачные карточки */
-    --card-foreground: 0 0% 98%;
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --text-tertiary: #52525b;
 
-    --popover: 225 12% 8%;
-    --popover-foreground: 0 0% 98%;
+    --accent-positive: #10b981;
+    --accent-negative: #ef4444;
+    --accent-neutral: #ffffff;
+    --tier-t1: #ffd700;
 
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 5%;
+    --btn-bg: #ffffff;
+    --btn-text: #000000;
+    --btn-hover: #e5e5e5;
 
-    --secondary: 225 10% 18%;
-    --secondary-foreground: 0 0% 98%;
+    /* Semantic Tailwind HSL tokens */
+    --background: 0 0% 4%;           /* #0a0a0a - чистый глубокий матовый черный */
+    --foreground: 0 0% 100%;         /* #ffffff - чистый белый текст */
 
-    --muted: 225 10% 20%;
-    --muted-foreground: 220 5% 65%;
+    --card: 0 0% 6.7%;               /* #111111 - контрастные четкие панели, не сливающиеся с фоном */
+    --card-foreground: 0 0% 100%;
 
-    --accent: 225 10% 22%;
-    --accent-foreground: 0 0% 98%;
+    --popover: 0 0% 6.7%;            /* #111111 */
+    --popover-foreground: 0 0% 100%;
 
-    --destructive: 0 0% 90%;
-    --destructive-foreground: 0 0% 5%;
+    --primary: 0 0% 100%;            /* #ffffff - чистый белый акцент */
+    --primary-foreground: 0 0% 0%;   /* #000000 */
 
-    --border: 225 10% 26%; /* #393c47 - четкие видимые контуры */
-    --input: 225 10% 26%;
-    --ring: 0 0% 98%;
+    --secondary: 0 0% 10%;           /* #1a1a1a */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 10%;               /* #1a1a1a */
+    --muted-foreground: 240 5% 65%;  /* #a1a1aa - читаемый вторичный серый */
+
+    --accent: 0 0% 10%;              /* #1a1a1a */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;        /* #ef4444 - красный */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 13.5%;            /* #222222 - строгие выразительные границы */
+    --input: 0 0% 4%;                /* #0a0a0a - контрастные инпуты */
+    --ring: 0 0% 100%;               /* #ffffff */
 
     --radius: 0.5rem;
   }
@@ -41,12 +62,22 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased min-h-screen selection:bg-white/20 selection:text-white;
-    background-color: #24262d;
-    background-image: 
-      radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.04) 0%, transparent 60%),
-      radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
-    background-attachment: fixed;
+    @apply bg-background text-foreground antialiased min-h-screen selection:bg-white selection:text-black;
+    background-color: #0a0a0a;
+  }
+}
+
+@layer components {
+  /* EFL Panel styling */
+  .panel {
+    background-color: #111111;
+    border: 1px solid #222222;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+  .panel:hover {
+    background-color: #1a1a1a;
+    border-color: #ffffff;
   }
 }
 
@@ -56,12 +87,12 @@
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #24262d;
+  background: #0a0a0a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #424652;
+  background: #222222;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #5a5f6e;
+  background: #333333;
 }

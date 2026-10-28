@@ -88,6 +88,7 @@ export default function NotificationsPage() {
     switch (type) {
       case 'MATCH_REMINDER':
         return <Clock className="w-4 h-4 text-white" />;
+      case 'CHALLENGE':
       case 'MATCH_AUTO_CONFIRMED':
       case 'MATCH_CONFIRMED':
         return <Swords className="w-4 h-4 text-white" />;

@@ -101,9 +101,6 @@ export default function SettingsPage() {
                   <span className="font-bold text-foreground text-lg">{user.nickname}</span>
                   {user.role === 'ADMIN' && <Badge variant="admin">ADMIN</Badge>}
                 </div>
-                <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                  SteamID: {user.steamId}
-                </p>
               </div>
             </div>
 

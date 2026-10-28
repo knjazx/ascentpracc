@@ -25,26 +25,35 @@ export function generateVetoSteps(
     // Last decider side is chosen by the team that banned second
     steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE });
   } else if (format === 'BO3') {
-    // Standard competitive BO3:
-    // 1. T1 Ban, 2. T2 Ban
-    // 3. T1 Pick Map 1, 4. T2 Side choice on Map 1
-    // 5. T2 Pick Map 2, 6. T1 Side choice on Map 2
-    // 7. T1 Ban, 8. T2 Ban
-    // 9. Remaining -> Decider Map 3
-    // 10. T2 (team that banned last) Side choice on Decider
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.BAN });
+    // Dynamic competitive BO3:
+    // Requires 2 picks and 1 decider = 3 maps.
+    // 1. Initial bans (if at least 6 maps available, ban 1 each)
+    const initialBans = totalAvailableMaps >= 6 ? 2 : 0;
+    if (initialBans === 2) {
+      steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
+      steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.BAN });
+    }
 
+    // 2. Picks
     steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
     steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE }); // Opponent picks side
 
     steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
     steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE }); // Opponent picks side
 
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.BAN });
+    // 3. Second ban phase: ban down until exactly 1 decider map remains
+    const remainingBans = Math.max(0, totalAvailableMaps - initialBans - 2 - 1);
+    let lastBanRole: TeamRole = secondRole;
+    for (let i = 0; i < remainingBans; i++) {
+      lastBanRole = i % 2 === 0 ? firstRole : secondRole;
+      steps.push({ order: order++, teamRole: lastBanRole, actionType: VetoType.BAN });
+    }
 
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE }); // Side choice on decider
+    // 4. Side choice on decider
+    const deciderSideRole: TeamRole = remainingBans > 0
+      ? (lastBanRole === 'TEAM_A' ? 'TEAM_B' : 'TEAM_A')
+      : secondRole;
+    steps.push({ order: order++, teamRole: deciderSideRole, actionType: VetoType.SIDE });
   } else if (format === 'BO2') {
     // BO2 Scrim format: each team picks 1 map, opponent picks starting side
     steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });

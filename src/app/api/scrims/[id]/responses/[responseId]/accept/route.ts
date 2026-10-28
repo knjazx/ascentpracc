@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { ScrimStatus, ResponseStatus, MatchStatus, Role } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function POST(
   _request: NextRequest,
@@ -182,6 +183,10 @@ export async function POST(
 
       return createdMatch;
     });
+
+    memoryCache.invalidate(`scrim:detail:${requestId}`);
+    memoryCache.invalidate('feed:');
+    memoryCache.invalidate('matches:');
 
     return NextResponse.json({
       success: true,

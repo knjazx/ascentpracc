@@ -29,17 +29,17 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
     filters.date !== 'all';
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3 shadow-xl shadow-black/40">
+    <div className="rounded-lg border border-[#222222] bg-[#111111] p-4 space-y-3 shadow-lg">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         {/* Search */}
         <div className="relative sm:col-span-2 lg:col-span-2">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b]" />
           <Input
             type="text"
             placeholder="Поиск по команде или тегу..."
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            className="pl-9 bg-cs-panel border border-border"
+            className="pl-9 bg-[#0a0a0a] border border-[#222222] text-white placeholder:text-[#52525b] focus-visible:ring-white focus:border-white"
           />
         </div>
 
@@ -48,13 +48,13 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
           <select
             value={filters.platform || 'all'}
             onChange={(e) => onChange({ ...filters, platform: e.target.value })}
-            className="flex h-10 w-full rounded-md border border-border bg-cs-panel px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer"
+            className="flex h-10 w-full rounded-md border border-[#222222] bg-[#0a0a0a] px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white focus:border-white cursor-pointer"
           >
-            <option value="all">Платформа: Все</option>
-            <option value="CYBERSHOCK">Cybershock</option>
-            <option value="XPLAY">Xplay</option>
-            <option value="FASTCUP">Fastcup</option>
-            <option value="OTHER">Другой</option>
+            <option value="all" className="bg-[#111111] text-white">Платформа: Все</option>
+            <option value="CYBERSHOCK" className="bg-[#111111] text-white">Cybershock</option>
+            <option value="XPLAY" className="bg-[#111111] text-white">Xplay</option>
+            <option value="FASTCUP" className="bg-[#111111] text-white">Fastcup</option>
+            <option value="OTHER" className="bg-[#111111] text-white">Другой</option>
           </select>
         </div>
 
@@ -63,12 +63,12 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
           <select
             value={filters.format}
             onChange={(e) => onChange({ ...filters, format: e.target.value })}
-            className="flex h-10 w-full rounded-md border border-border bg-cs-panel px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer"
+            className="flex h-10 w-full rounded-md border border-[#222222] bg-[#0a0a0a] px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white focus:border-white cursor-pointer"
           >
-            <option value="all">Формат: Все</option>
-            <option value="BO1">Формат: BO1</option>
-            <option value="BO2">Формат: BO2</option>
-            <option value="BO3">Формат: BO3</option>
+            <option value="all" className="bg-[#111111] text-white">Формат: Все</option>
+            <option value="BO1" className="bg-[#111111] text-white">Формат: BO1</option>
+            <option value="BO2" className="bg-[#111111] text-white">Формат: BO2</option>
+            <option value="BO3" className="bg-[#111111] text-white">Формат: BO3</option>
           </select>
         </div>
 
@@ -77,13 +77,13 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
           <select
             value={filters.serverBy}
             onChange={(e) => onChange({ ...filters, serverBy: e.target.value })}
-            className="flex h-10 w-full rounded-md border border-border bg-cs-panel px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer font-medium"
+            className="flex h-10 w-full rounded-md border border-[#222222] bg-[#0a0a0a] px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white focus:border-white cursor-pointer font-medium"
           >
-            <option value="all">Сервер: Все</option>
-            <option value="negotiable">По договоренности</option>
-            <optgroup label="Локации серверов" className="bg-neutral-900 text-white font-bold">
+            <option value="all" className="bg-[#111111] text-white">Сервер: Все</option>
+            <option value="negotiable" className="bg-[#111111] text-white">По договоренности</option>
+            <optgroup label="Локации серверов" className="bg-[#111111] text-white font-bold">
               {SERVER_LOCATIONS.map((loc) => (
-                <option key={loc.id} value={loc.city} className="bg-neutral-900 text-neutral-200">
+                <option key={loc.id} value={loc.city} className="bg-[#111111] text-[#a1a1aa]">
                   {loc.flag} {loc.city}
                 </option>
               ))}
@@ -96,11 +96,11 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
           <select
             value={filters.date}
             onChange={(e) => onChange({ ...filters, date: e.target.value })}
-            className="flex h-10 w-full rounded-md border border-border bg-cs-panel px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer"
+            className="flex h-10 w-full rounded-md border border-[#222222] bg-[#0a0a0a] px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white focus:border-white cursor-pointer"
           >
-            <option value="all">Дата: Любая</option>
-            <option value="today">Сегодня</option>
-            <option value="tomorrow">Завтра</option>
+            <option value="all" className="bg-[#111111] text-white">Дата: Любая</option>
+            <option value="today" className="bg-[#111111] text-white">Сегодня</option>
+            <option value="tomorrow" className="bg-[#111111] text-white">Завтра</option>
           </select>
 
           {isFiltered && (
@@ -109,7 +109,7 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
               size="icon"
               onClick={onReset}
               title="Сбросить фильтры"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="shrink-0 text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]"
             >
               <X className="w-4 h-4" />
             </Button>

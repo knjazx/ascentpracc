@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { scrimCreateSchema } from '@/lib/validations/scrim';
 import { ScrimStatus, MatchStatus, Prisma } from '@prisma/client';
 import { addDays, startOfDay, endOfDay } from 'date-fns';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -15,18 +16,34 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '12', 10)));
   const skip = (page - 1) * limit;
 
+  const server = searchParams.get('server') || serverBy;
+  const platform = searchParams.get('platform');
+  const teamId = searchParams.get('teamId');
+
+  const cacheKey = teamId
+    ? null
+    : `scrims:${format || 'all'}:${server || 'all'}:${platform || 'all'}:${dateFilter || 'all'}:${search || ''}:${page}:${limit}`;
+  const cached = cacheKey ? memoryCache.get(cacheKey) : null;
+  if (cached) {
+    return NextResponse.json(cached);
+  }
+
   const now = new Date();
 
   const where: Prisma.ScrimRequestWhereInput = {
     status: ScrimStatus.OPEN,
     expiresAt: { gt: now },
+    NOT: { level: { startsWith: 'CHALLENGE:' } },
   };
+
+  if (teamId) {
+    where.teamId = teamId;
+  }
 
   if (format && ['BO1', 'BO2', 'BO3'].includes(format)) {
     where.format = format as Prisma.EnumScrimFormatFilter['equals'];
   }
 
-  const server = searchParams.get('server') || serverBy;
   if (server && server !== 'all') {
     if (server === 'negotiable' || server === 'NEGOTIABLE' || server === 'По договоренности') {
       where.OR = [
@@ -40,7 +57,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const platform = searchParams.get('platform');
   if (platform && ['CYBERSHOCK', 'XPLAY', 'FASTCUP', 'OTHER'].includes(platform)) {
     where.platform = platform;
   }
@@ -93,7 +109,6 @@ export async function GET(request: NextRequest) {
           },
         },
         slots: {
-          where: { startsAt: { gt: now } },
           orderBy: { startsAt: 'asc' },
         },
         _count: {
@@ -104,28 +119,31 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  return NextResponse.json(
-    {
-      success: true,
-      data: {
-        scrims: scrims.map((s) => ({
-          ...s,
-          responsesCount: s._count.responses,
-        })),
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
+  const payload = {
+    success: true,
+    data: {
+      scrims: scrims.map((s) => ({
+        ...s,
+        responsesCount: s._count.responses,
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
     },
-    {
-      headers: {
-        'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=10',
-      },
-    }
-  );
+  };
+
+  if (cacheKey) {
+    memoryCache.set(cacheKey, payload, 60);
+  }
+
+  return NextResponse.json(payload, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=10',
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -137,6 +155,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validated = scrimCreateSchema.parse(body);
+
+    memoryCache.invalidate('scrims:');
+    memoryCache.invalidate('feed:');
+    memoryCache.invalidate('scrim:');
 
     // 1. Verify user is a manager of the team
     const managerRecord = await prisma.teamManager.findUnique({
@@ -155,20 +177,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Check open requests limit (max 5)
-    const openCount = await prisma.scrimRequest.count({
+    // 2. Check open requests limit (strictly max 1 open scrim per team)
+    const existingOpenScrim = await prisma.scrimRequest.findFirst({
       where: {
         teamId: validated.teamId,
         status: ScrimStatus.OPEN,
         expiresAt: { gt: new Date() },
       },
+      select: { id: true },
     });
 
-    if (openCount >= 5) {
+    if (existingOpenScrim) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Лимит открытых заявок для команды исчерпан (максимум 5). Дождитесь матчей или отмените старые.',
+          error: 'У вашей команды уже есть открытая заявка на прак. Команда может иметь максимум 1 открытую заявку одновременно.',
         },
         { status: 400 }
       );
@@ -204,13 +227,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Determine expiresAt (either 7 days from now or earliest slot start)
-    const now = new Date();
-    const defaultExpiry = new Date(now.getTime() + validated.expiresInDays * 24 * 60 * 60 * 1000);
-    const earliestSlot = new Date(
-      Math.min(...validated.slots.map((s) => new Date(s.startsAt).getTime()))
+    // 4. Determine expiresAt (until latest slot finishes: startsAt + durationMin)
+    const slotEndTimes = validated.slots.map(
+      (s) => new Date(s.startsAt).getTime() + (s.durationMin || 120) * 60 * 1000
     );
-    const expiresAt = earliestSlot < defaultExpiry ? earliestSlot : defaultExpiry;
+    const expiresAt = new Date(Math.max(...slotEndTimes));
 
     // 5. Create ScrimRequest + Slots in a transaction
     const createdRequest = await prisma.$transaction(async (tx) => {
@@ -241,6 +262,11 @@ export async function POST(request: NextRequest) {
       });
       return scrim;
     });
+
+    memoryCache.invalidate('scrims:');
+    memoryCache.invalidate('scrims:');
+    memoryCache.invalidate('feed:');
+    memoryCache.invalidate('scrim:');
 
     return NextResponse.json({ success: true, data: createdRequest }, { status: 201 });
   } catch (err: unknown) {

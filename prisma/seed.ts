@@ -12,8 +12,9 @@ const DEFAULT_MAPS = [
   { map: 'de_ancient', displayName: 'Ancient', active: true, defaultPool: true, imageUrl: '/maps/de_ancient.webp' },
   { map: 'de_anubis', displayName: 'Anubis', active: true, defaultPool: true, imageUrl: '/maps/de_anubis.webp' },
   { map: 'de_dust2', displayName: 'Dust II', active: true, defaultPool: true, imageUrl: '/maps/de_dust2.webp' },
-  { map: 'de_overpass', displayName: 'Overpass', active: true, defaultPool: true, imageUrl: '/maps/de_overpass.webp' },
-  { map: 'de_vertigo', displayName: 'Vertigo', active: false, defaultPool: false, imageUrl: '/maps/de_vertigo.webp' },
+  { map: 'de_cache', displayName: 'Cache', active: true, defaultPool: true, imageUrl: '/maps/de_cache.webp' },
+  { map: 'de_vertigo', displayName: 'Vertigo', active: true, defaultPool: true, imageUrl: '/maps/de_vertigo.webp' },
+  { map: 'de_overpass', displayName: 'Overpass', active: false, defaultPool: false, imageUrl: '/maps/de_overpass.webp' },
   { map: 'de_train', displayName: 'Train', active: false, defaultPool: false, imageUrl: '/maps/de_train.webp' },
 ];
 

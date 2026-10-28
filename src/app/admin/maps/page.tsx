@@ -175,18 +175,30 @@ export default function AdminMapsPage() {
                   : 'border-neutral-800/60 bg-neutral-950/40 opacity-60'
               }`}
             >
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-base font-extrabold capitalize text-foreground">
-                    {map.displayName}
-                  </p>
-                  <div className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                    <span>код: {map.map}</span>
-                    {map.defaultPool && (
-                      <Badge variant="outline" className="text-[9px] border-neutral-700">
-                        Default
-                      </Badge>
-                    )}
+              <CardContent className="p-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-9 rounded-md overflow-hidden bg-black/60 border border-white/10 shrink-0">
+                    <img
+                      src={`/maps/${map.map}.webp`}
+                      alt={map.displayName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-extrabold capitalize text-foreground">
+                      {map.displayName}
+                    </p>
+                    <div className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+                      <span>код: {map.map}</span>
+                      {map.defaultPool && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 border-neutral-700">
+                          Default
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
 

@@ -9,6 +9,7 @@ import { Swords, Search, Calendar, ChevronRight, Trophy, ShieldAlert, Radio } fr
 import Link from 'next/link';
 import { formatUtcToZoned } from '@/lib/date';
 import { useUser } from '@/hooks/useUser';
+import { getClientCache, setClientCache } from '@/lib/client-cache';
 
 interface MatchItem {
   id: string;
@@ -39,17 +40,24 @@ interface MatchItem {
 
 export default function MatchesPage() {
   const { user } = useUser();
-  const [matches, setMatches] = useState<MatchItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ALL' | 'LIVE' | 'FINISHED'>('ALL');
   const [search, setSearch] = useState('');
   const [format, setFormat] = useState<string>('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+
+  const cacheKey = `matches:${activeTab}:${format}:${search}:${page}`;
+  const initialCache = getClientCache<{ matches: MatchItem[]; totalPages: number }>(cacheKey);
+
+  const [matches, setMatches] = useState<MatchItem[]>(initialCache?.matches || []);
+  const [loading, setLoading] = useState(!initialCache);
+  const [totalPages, setTotalPages] = useState(initialCache?.totalPages || 1);
 
   const fetchMatches = async () => {
     try {
-      setLoading(true);
+      const key = `matches:${activeTab}:${format}:${search}:${page}`;
+      if (!getClientCache(key)) {
+        setLoading(true);
+      }
       const params = new URLSearchParams();
 
       if (activeTab === 'LIVE') {
@@ -68,7 +76,9 @@ export default function MatchesPage() {
 
       if (data.success) {
         setMatches(data.data.matches);
-        setTotalPages(data.data.pagination.totalPages);
+        const total = data.data.pagination.totalPages;
+        setTotalPages(total);
+        setClientCache(key, { matches: data.data.matches, totalPages: total });
       }
     } catch (err) {
       console.error('Error fetching matches:', err);
@@ -146,36 +156,36 @@ export default function MatchesPage() {
       </div>
 
       {/* Tabs & Format filter */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#222222] pb-3">
         <div className="flex items-center gap-2">
           <Button
-            variant={activeTab === 'ALL' ? 'default' : 'ghost'}
+            variant={activeTab === 'ALL' ? 'cs' : 'ghost'}
             size="sm"
             onClick={() => { setActiveTab('ALL'); setPage(1); }}
-            className="text-xs h-8"
+            className={`text-xs h-8 ${activeTab === 'ALL' ? '' : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'}`}
           >
             Все матчи
           </Button>
           <Button
-            variant={activeTab === 'LIVE' ? 'default' : 'ghost'}
+            variant={activeTab === 'LIVE' ? 'cs' : 'ghost'}
             size="sm"
             onClick={() => { setActiveTab('LIVE'); setPage(1); }}
-            className="text-xs h-8"
+            className={`text-xs h-8 ${activeTab === 'LIVE' ? '' : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'}`}
           >
             Live и предстоящие
           </Button>
           <Button
-            variant={activeTab === 'FINISHED' ? 'default' : 'ghost'}
+            variant={activeTab === 'FINISHED' ? 'cs' : 'ghost'}
             size="sm"
             onClick={() => { setActiveTab('FINISHED'); setPage(1); }}
-            className="text-xs h-8"
+            className={`text-xs h-8 ${activeTab === 'FINISHED' ? '' : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'}`}
           >
             Завершенные
           </Button>
         </div>
 
         {/* Format selector */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-[#a1a1aa]">
           <span>Формат:</span>
           {['', 'BO1', 'BO2', 'BO3'].map((f) => (
             <button
@@ -184,7 +194,7 @@ export default function MatchesPage() {
               className={`px-2 py-0.5 rounded text-xs transition-colors ${
                 format === f
                   ? 'bg-white text-black font-bold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  : 'text-[#a1a1aa] hover:text-white'
               }`}
             >
               {f || 'Все'}
@@ -195,12 +205,12 @@ export default function MatchesPage() {
 
       {/* Matches List */}
       {loading ? (
-        <div className="py-20 text-center text-muted-foreground animate-pulse text-sm">
+        <div className="py-20 text-center text-[#a1a1aa] animate-pulse text-sm">
           Загрузка списка матчей...
         </div>
       ) : matches.length === 0 ? (
-        <Card className="border border-border bg-card shadow-xl py-16 text-center">
-          <p className="text-muted-foreground text-sm">Матчи не найдены</p>
+        <Card className="border border-[#222222] bg-[#111111] shadow-xl py-16 text-center">
+          <p className="text-[#a1a1aa] text-sm">Матчи не найдены</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -221,7 +231,7 @@ export default function MatchesPage() {
             return (
               <Card
                 key={m.id}
-                className="border border-border bg-card hover:border-white/50 transition-all shadow-xl shadow-black/40 group"
+                className="border border-[#222222] bg-[#111111] hover:border-white hover:bg-[#141414] transition-all shadow-xl group"
               >
                 <CardContent className="p-4 md:p-5">
                   <div className="grid grid-cols-1 md:grid-cols-12 items-center gap-4">
@@ -229,11 +239,11 @@ export default function MatchesPage() {
                     <div className="md:col-span-3 space-y-1.5">
                       <div className="flex items-center gap-2">
                         {getStatusBadge(m.status)}
-                        <Badge variant="outline" className="text-[10px] font-mono border-border">
+                        <Badge variant="outline" className="text-[10px] font-mono border-[#222222] bg-[#0a0a0a] text-white">
                           {m.format}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                      <div className="flex items-center gap-1.5 text-xs text-[#a1a1aa] font-mono">
                         <Calendar className="w-3.5 h-3.5 text-white" />
                         <span>{scheduledFormatted}</span>
                       </div>
@@ -244,14 +254,14 @@ export default function MatchesPage() {
                       {/* Team A */}
                       <div className="flex-1 text-right flex items-center justify-end gap-3 min-w-0">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-foreground truncate group-hover:text-white transition-colors">
+                          <p className="text-sm font-bold text-white truncate transition-colors">
                             {m.teamA.name}
                           </p>
-                          <span className="text-[11px] font-mono text-muted-foreground">
+                          <span className="text-[11px] font-mono text-[#a1a1aa]">
                             [{m.teamA.tag}]
                           </span>
                         </div>
-                        <div className="w-10 h-10 rounded-md bg-cs-panel border border-border flex items-center justify-center shrink-0 overflow-hidden">
+                        <div className="w-10 h-10 rounded-lg bg-[#0a0a0a] border border-[#222222] flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                           {m.teamA.logoUrl ? (
                             <img src={m.teamA.logoUrl} alt={m.teamA.name} className="w-full h-full object-cover" />
                           ) : (
@@ -263,19 +273,19 @@ export default function MatchesPage() {
                       </div>
 
                       {/* Score or VS Badge */}
-                      <div className="shrink-0 px-3 py-1.5 rounded bg-cs-panel border border-border text-center min-w-[70px]">
+                      <div className="shrink-0 px-3 py-1.5 rounded-lg bg-[#0a0a0a] border border-[#222222] text-center min-w-[70px]">
                         {m.status === 'CONFIRMED' ? (
-                          <div className="text-base font-extrabold font-mono tracking-wider text-foreground">
-                            <span className={seriesWinsA > seriesWinsB ? 'text-white font-black' : 'text-neutral-400'}>
+                          <div className="text-base font-extrabold font-mono tracking-wider text-white">
+                            <span className={seriesWinsA > seriesWinsB ? 'text-[#10b981] font-black' : 'text-[#a1a1aa]'}>
                               {seriesWinsA}
                             </span>
-                            <span className="text-neutral-500 mx-1">:</span>
-                            <span className={seriesWinsB > seriesWinsA ? 'text-white font-black' : 'text-neutral-400'}>
+                            <span className="text-[#52525b] mx-1">:</span>
+                            <span className={seriesWinsB > seriesWinsA ? 'text-[#10b981] font-black' : 'text-[#a1a1aa]'}>
                               {seriesWinsB}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-xs font-bold font-mono tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold font-mono tracking-widest text-[#a1a1aa]">
                             VS
                           </span>
                         )}
@@ -283,7 +293,7 @@ export default function MatchesPage() {
 
                       {/* Team B */}
                       <div className="flex-1 text-left flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-md bg-cs-panel border border-border flex items-center justify-center shrink-0 overflow-hidden">
+                        <div className="w-10 h-10 rounded-lg bg-[#0a0a0a] border border-[#222222] flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                           {m.teamB.logoUrl ? (
                             <img src={m.teamB.logoUrl} alt={m.teamB.name} className="w-full h-full object-cover" />
                           ) : (
@@ -293,10 +303,10 @@ export default function MatchesPage() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-foreground truncate group-hover:text-white transition-colors">
+                          <p className="text-sm font-bold text-white truncate transition-colors">
                             {m.teamB.name}
                           </p>
-                          <span className="text-[11px] font-mono text-muted-foreground">
+                          <span className="text-[11px] font-mono text-[#a1a1aa]">
                             [{m.teamB.tag}]
                           </span>
                         </div>
@@ -306,7 +316,7 @@ export default function MatchesPage() {
                     {/* Action link (2 cols) */}
                     <div className="md:col-span-2 flex justify-end">
                       <Link href={`/matches/${m.id}`}>
-                        <Button variant="ghost" size="sm" className="text-xs gap-1 group-hover:text-white">
+                        <Button variant="outline" size="sm" className="text-xs gap-1 border-[#222222] text-white hover:bg-white hover:text-black">
                           <span>Детали</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </Button>

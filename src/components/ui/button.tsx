@@ -22,19 +22,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       default:
-        "bg-primary text-primary-foreground shadow hover:bg-primary/90 font-semibold",
+        "bg-white text-black font-semibold hover:bg-[#e5e5e5] transition-colors",
       destructive:
-        "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        "bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/30 hover:bg-[#ef4444]/25 transition-all font-semibold",
       outline:
-        "border border-border bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground text-foreground",
+        "border border-[#222222] bg-transparent shadow-sm hover:bg-[#1a1a1a] hover:border-white text-white transition-all",
       secondary:
-        "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        "bg-[#1a1a1a] text-white hover:bg-[#222222] border border-[#222222] shadow-sm transition-all",
       ghost:
-        "hover:bg-accent hover:text-accent-foreground text-muted-foreground hover:text-foreground",
-      link: "text-primary underline-offset-4 hover:underline",
-      cs: "bg-white text-black font-bold uppercase tracking-wider shadow-md hover:bg-neutral-200 border border-white hover:shadow-white/10 transition-all",
+        "hover:bg-[#1a1a1a] hover:text-white text-[#a1a1aa] transition-all",
+      link: "text-white underline-offset-4 hover:underline",
+      cs: "bg-white text-black font-bold uppercase tracking-wider shadow-sm hover:bg-[#e5e5e5] border border-white transition-all",
       steam:
-        "bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 shadow-md hover:border-white transition-all",
+        "bg-[#111111] hover:bg-[#1a1a1a] text-white border border-[#222222] shadow-sm hover:border-white transition-all",
     };
 
     const sizeStyles = {

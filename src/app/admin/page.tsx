@@ -192,7 +192,7 @@ export default function AdminDashboardPage() {
                 Пул соревновательных карт
               </h2>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Управление списком карт для драфта вето в BO1/BO2/BO3 (Mirage, Inferno, Nuke, Ancient, Anubis, Dust2...).
+                Управление списком карт для драфта вето в BO1/BO2/BO3 (Mirage, Inferno, Nuke, Ancient, Anubis, Dust II, Cache, Vertigo).
               </p>
             </div>
             <div className="pt-4 flex items-center justify-between text-xs font-semibold text-white">

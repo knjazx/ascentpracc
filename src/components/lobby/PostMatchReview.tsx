@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar, Star, ShieldAlert, Swords, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Calendar, Star, ShieldAlert, Swords, CheckCircle2, MessageSquare, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { ReportTeamModal } from '@/components/matches/ReportTeamModal';
 
 interface PostMatchReviewProps {
   matchId: string;
@@ -33,6 +34,7 @@ export function PostMatchReview({
   const [submittingRating, setSubmittingRating] = useState<boolean>(false);
   const [ratingSaved, setRatingSaved] = useState<boolean>(false);
   const [reportingNoShow, setReportingNoShow] = useState<boolean>(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const isConfirmed = status === 'CONFIRMED';
@@ -49,6 +51,11 @@ export function PostMatchReview({
 
   const handleRatingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!comment.trim() || comment.trim().length < 5) {
+      setMsg({ type: 'error', text: 'Пожалуйста, обязательно опишите ситуацию в комментарии (минимум 5 символов)' });
+      return;
+    }
+
     setSubmittingRating(true);
     setMsg(null);
 
@@ -59,7 +66,7 @@ export function PostMatchReview({
         body: JSON.stringify({
           punctuality,
           sportsmanship,
-          comment: comment.trim() || undefined,
+          comment: comment.trim(),
         }),
       });
 
@@ -240,14 +247,23 @@ export function PostMatchReview({
                   </div>
                 </div>
 
-                <Input
-                  type="text"
-                  placeholder="Отзыв о сопернике (опционально)"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  maxLength={300}
-                  className="text-xs h-8"
-                />
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground font-semibold">
+                      Описание ситуации <span className="text-rose-400">*</span>:
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-mono">обязательно</span>
+                  </div>
+                  <textarea
+                    placeholder="Обязательно опишите, как прошел матч (пунктуальность соперника, поведение, инциденты)..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    required
+                    className="w-full rounded-md border border-input bg-cs-panel px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white resize-none"
+                  />
+                </div>
 
                 <Button
                   type="submit"
@@ -264,9 +280,33 @@ export function PostMatchReview({
                 <span>Вы оставили отзыв об этой команде.</span>
               </div>
             )}
+
+            {/* Match Complaint / Report trigger */}
+            <div className="pt-3 border-t border-[#222222] flex items-center justify-between">
+              <span className="text-[11px] text-[#71717a]">Были серьёзные нарушения?</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsReportModalOpen(true)}
+                className="h-7 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 gap-1.5 px-2 font-mono"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Пожаловаться на команду</span>
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
+
+      {/* Opponent Complaint Modal */}
+      <ReportTeamModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        matchId={matchId}
+        opponentTeam={opponentTeam}
+        onReportSuccess={onRefresh}
+      />
     </Card>
   );
 }

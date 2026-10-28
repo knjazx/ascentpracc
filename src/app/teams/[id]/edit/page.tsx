@@ -455,7 +455,6 @@ export default function EditTeamPage() {
                       <p className="text-sm font-bold text-foreground">{m.user.nickname}</p>
                       {m.isOwner && <Badge variant="cs" className="text-[10px] px-1.5 py-0">Владелец</Badge>}
                     </div>
-                    <p className="text-xs font-mono text-muted-foreground">SteamID: {m.user.steamId}</p>
                   </div>
                 </div>
 

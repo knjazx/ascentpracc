@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { ResponseStatus, Role } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function POST(
   _request: NextRequest,
@@ -44,6 +45,9 @@ export async function POST(
     where: { id: responseId },
     data: { status: ResponseStatus.WITHDRAWN },
   });
+
+  memoryCache.invalidate(`scrim:detail:${requestId}`);
+  memoryCache.invalidate('feed:');
 
   return NextResponse.json({ success: true, message: 'Отклик успешно отозван' });
 }

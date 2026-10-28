@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { MatchStatus, ScrimFormat, Prisma } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +13,12 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '10', 10)));
     const skip = (page - 1) * limit;
+
+    const cacheKey = `matches:${statusParam || 'all'}:${teamId || 'all'}:${formatParam || 'all'}:${search || ''}:${page}:${limit}`;
+    const cached = memoryCache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
 
     const where: Prisma.MatchWhereInput = {};
 
@@ -87,25 +94,26 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          matches,
-          pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-          },
+    const payload = {
+      success: true,
+      data: {
+        matches,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
       },
-      {
-        headers: {
-          'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=15',
-        },
-      }
-    );
+    };
+
+    memoryCache.set(cacheKey, payload, 60);
+
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=15',
+      },
+    });
   } catch (err: unknown) {
     console.error('Error in GET /api/matches:', err);
     return NextResponse.json(

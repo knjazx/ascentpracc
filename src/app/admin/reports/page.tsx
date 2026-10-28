@@ -157,9 +157,6 @@ export default function AdminReportsPage() {
                     <span className="font-bold text-foreground">
                       {report.reporter.nickname}
                     </span>
-                    <span className="font-mono text-[11px]">
-                      ({report.reporter.steamId})
-                    </span>
                   </div>
                 </div>
 

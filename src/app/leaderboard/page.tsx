@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Star, ShieldAlert, Swords, ChevronRight, Award, Flame } from 'lucide-react';
 import Link from 'next/link';
+import { getClientCache, setClientCache } from '@/lib/client-cache';
 
 interface LeaderboardTeam {
   rank: number;
@@ -32,17 +33,30 @@ interface LeaderboardTeam {
   };
 }
 
+function getWinRateColor(rate: number) {
+  if (rate < 50) return 'text-red-500';
+  if (rate === 50) return 'text-[#a1a1aa]';
+  return 'text-emerald-400';
+}
+
 export default function LeaderboardPage() {
-  const [teams, setTeams] = useState<LeaderboardTeam[]>([]);
-  const [loading, setLoading] = useState(true);
   const [minMatches, setMinMatches] = useState<number>(0);
   const [sortBy, setSortBy] = useState<'winRate' | 'wins' | 'matchesPlayed'>('winRate');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+
+  const cacheKey = `leaderboard:${minMatches}:${sortBy}:${page}`;
+  const initialCache = getClientCache<{ teams: LeaderboardTeam[]; totalPages: number }>(cacheKey);
+
+  const [teams, setTeams] = useState<LeaderboardTeam[]>(initialCache?.teams || []);
+  const [loading, setLoading] = useState(!initialCache);
+  const [totalPages, setTotalPages] = useState(initialCache?.totalPages || 1);
 
   const fetchLeaderboard = async () => {
     try {
-      setLoading(true);
+      const key = `leaderboard:${minMatches}:${sortBy}:${page}`;
+      if (!getClientCache(key)) {
+        setLoading(true);
+      }
       const params = new URLSearchParams({
         minMatches: String(minMatches),
         sortBy,
@@ -55,7 +69,9 @@ export default function LeaderboardPage() {
 
       if (data.success) {
         setTeams(data.data.teams);
-        setTotalPages(data.data.pagination.totalPages);
+        const total = data.data.pagination.totalPages;
+        setTotalPages(total);
+        setClientCache(key, { teams: data.data.teams, totalPages: total });
       }
     } catch (err) {
       console.error('Error fetching leaderboard:', err);
@@ -71,42 +87,42 @@ export default function LeaderboardPage() {
   const getRankBadge = (rank: number) => {
     if (rank === 1) {
       return (
-        <span className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-black text-xs shadow-sm">
+        <span className="w-7 h-7 rounded-full bg-[#ffd700] text-black flex items-center justify-center font-black text-xs shadow-sm">
           1
         </span>
       );
     }
     if (rank === 2) {
       return (
-        <span className="w-7 h-7 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 flex items-center justify-center font-bold text-xs">
+        <span className="w-7 h-7 rounded-full bg-[#e2e8f0] text-black flex items-center justify-center font-bold text-xs shadow-sm">
           2
         </span>
       );
     }
     if (rank === 3) {
       return (
-        <span className="w-7 h-7 rounded-full bg-neutral-900 text-neutral-400 border border-neutral-800 flex items-center justify-center font-bold text-xs">
+        <span className="w-7 h-7 rounded-full bg-[#f59e0b] text-black flex items-center justify-center font-bold text-xs shadow-sm">
           3
         </span>
       );
     }
     return (
-      <span className="w-7 h-7 flex items-center justify-center font-mono text-xs text-neutral-500">
+      <span className="w-7 h-7 flex items-center justify-center font-mono text-xs text-[#a1a1aa]">
         {rank}
       </span>
     );
   };
 
   const renderFormPills = (formStr: string) => {
-    if (!formStr) return <span className="text-xs text-neutral-500">-</span>;
+    if (!formStr) return <span className="text-xs text-[#52525b]">-</span>;
     const chars = formStr.slice(-5).split('');
 
     return (
       <div className="flex items-center gap-1">
         {chars.map((c, i) => {
-          let color = 'bg-neutral-900 text-neutral-500 border border-neutral-800';
-          if (c === 'W') color = 'bg-white text-black font-bold';
-          if (c === 'L') color = 'bg-neutral-900 text-neutral-500 border border-neutral-800 font-bold';
+          let color = 'bg-[#0a0a0a] text-[#52525b] border border-[#222222]';
+          if (c === 'W') color = 'bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/40 font-bold';
+          if (c === 'L') color = 'bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/40 font-bold';
 
           return (
             <span
@@ -130,18 +146,18 @@ export default function LeaderboardPage() {
             <Trophy className="w-7 h-7 text-white" />
             <span>Таблица лидеров Ascent Pracc</span>
           </h1>
-          <p className="text-xs md:text-sm text-neutral-400 mt-1">
+          <p className="text-xs md:text-sm text-[#a1a1aa] mt-1">
             Рейтинг команд по результатам сыгранных праков, статистика побед и репутация
           </p>
         </div>
 
         {/* Filter controls */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center rounded-lg border border-border p-1 bg-muted/20 text-xs">
+          <div className="flex items-center rounded-lg border border-[#222222] p-1 bg-[#0a0a0a] text-xs">
             <button
               onClick={() => { setMinMatches(0); setPage(1); }}
               className={`px-3 py-1 rounded transition-colors ${
-                minMatches === 0 ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-foreground'
+                minMatches === 0 ? 'bg-white text-black font-bold' : 'text-[#a1a1aa] hover:text-white'
               }`}
             >
               Все команды
@@ -149,14 +165,14 @@ export default function LeaderboardPage() {
             <button
               onClick={() => { setMinMatches(5); setPage(1); }}
               className={`px-3 py-1 rounded transition-colors ${
-                minMatches === 5 ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-foreground'
+                minMatches === 5 ? 'bg-white text-black font-bold' : 'text-[#a1a1aa] hover:text-white'
               }`}
             >
               От 5 матчей
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs text-[#a1a1aa]">
             <span>Сортировка:</span>
             <select
               value={sortBy}
@@ -164,7 +180,7 @@ export default function LeaderboardPage() {
                 setSortBy(e.target.value as 'winRate' | 'wins' | 'matchesPlayed');
                 setPage(1);
               }}
-              className="bg-muted/40 border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none"
+              className="bg-[#0a0a0a] border border-[#222222] rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-white"
             >
               <option value="winRate">Винрейт (%)</option>
               <option value="wins">Победы</option>
@@ -175,21 +191,21 @@ export default function LeaderboardPage() {
       </div>
 
       {/* Leaderboard Table Card */}
-      <Card className="border border-border bg-card shadow-xl shadow-black/40 overflow-hidden">
+      <Card className="border border-[#222222] bg-[#111111] shadow-xl overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
-            <div className="py-24 text-center text-muted-foreground animate-pulse text-sm">
+            <div className="py-24 text-center text-[#a1a1aa] animate-pulse text-sm">
               Загрузка таблицы лидеров...
             </div>
           ) : teams.length === 0 ? (
-            <div className="py-20 text-center text-muted-foreground text-sm">
+            <div className="py-20 text-center text-[#a1a1aa] text-sm">
               Команд по заданным критериям пока нет.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-border bg-cs-panel text-muted-foreground font-mono uppercase text-[11px]">
+                  <tr className="border-b border-[#222222] bg-[#0a0a0a] text-[#52525b] font-mono uppercase text-[11px]">
                     <th className="py-3 px-4 w-12 text-center">#</th>
                     <th className="py-3 px-4">Команда</th>
                     <th className="py-3 px-3 text-center">Игры</th>
@@ -200,11 +216,11 @@ export default function LeaderboardPage() {
                     <th className="py-3 px-4 text-right">Действие</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/40">
+                <tbody className="divide-y divide-[#222222]">
                   {teams.map((t) => (
                     <tr
                       key={t.id}
-                      className="hover:bg-muted/20 transition-colors group"
+                      className="hover:bg-[#1a1a1a] transition-colors group"
                     >
                       {/* Rank */}
                       <td className="py-3.5 px-4 text-center">
@@ -216,11 +232,11 @@ export default function LeaderboardPage() {
                       {/* Team info */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded bg-muted/40 border border-border flex items-center justify-center overflow-hidden shrink-0">
+                          <div className="w-9 h-9 rounded bg-[#0a0a0a] border border-[#222222] flex items-center justify-center overflow-hidden shrink-0">
                             {t.logoUrl ? (
                               <img src={t.logoUrl} alt={t.name} className="w-full h-full object-cover" />
                             ) : (
-                              <span className="font-mono font-bold text-xs text-muted-foreground">
+                              <span className="font-mono font-bold text-xs text-white">
                                 {t.tag.slice(0, 2)}
                               </span>
                             )}
@@ -228,11 +244,11 @@ export default function LeaderboardPage() {
                           <div>
                             <Link
                               href={`/teams/${t.id}`}
-                              className="font-bold text-foreground text-sm hover:text-primary transition-colors block"
+                              className="font-bold text-white text-sm hover:underline transition-colors block"
                             >
                               {t.name}
                             </Link>
-                            <span className="text-[11px] font-mono text-muted-foreground">
+                            <span className="text-[11px] font-mono text-[#a1a1aa]">
                               [{t.tag}]
                             </span>
                           </div>
@@ -240,22 +256,22 @@ export default function LeaderboardPage() {
                       </td>
 
                       {/* Matches */}
-                      <td className="py-3.5 px-3 text-center font-mono font-bold text-foreground">
+                      <td className="py-3.5 px-3 text-center font-mono font-bold text-white">
                         {t.stats.matchesPlayed}
                       </td>
 
                       {/* W - L */}
                       <td className="py-3.5 px-3 text-center font-mono">
                         <span className="text-white font-bold">{t.stats.wins}</span>
-                        <span className="text-neutral-500 mx-1">-</span>
-                        <span className="text-neutral-500">{t.stats.losses}</span>
+                        <span className="text-[#52525b] mx-1">-</span>
+                        <span className="text-[#52525b]">{t.stats.losses}</span>
                       </td>
 
                       {/* Winrate */}
                       <td className="py-3.5 px-3 text-center">
                         <Badge
                           variant="outline"
-                          className="font-mono font-bold text-xs border-white/20 text-white bg-white/10"
+                          className={`font-mono font-bold text-xs border-[#222222] bg-[#0a0a0a] ${getWinRateColor(t.stats.winRate)}`}
                         >
                           {t.stats.winRate.toFixed(1)}%
                         </Badge>
@@ -272,15 +288,15 @@ export default function LeaderboardPage() {
                       <td className="py-3.5 px-3 text-center">
                         <div className="inline-flex flex-col items-center">
                           <div className="flex items-center gap-1 text-white font-bold font-mono">
-                            <Star className="w-3.5 h-3.5 fill-current text-white" />
+                            <Star className="w-3.5 h-3.5 fill-[#ffd700] text-[#ffd700]" />
                             <span>{t.rating.average.toFixed(1)}</span>
                           </div>
                           {t.noShowCount > 0 ? (
-                            <span className="text-[10px] text-neutral-400 font-mono">
+                            <span className="text-[10px] text-[#ef4444] font-mono">
                               {t.noShowCount} неявок
                             </span>
                           ) : (
-                            <span className="text-[10px] text-neutral-500">
+                            <span className="text-[10px] text-[#52525b]">
                               ({t.rating.count})
                             </span>
                           )}
@@ -291,12 +307,12 @@ export default function LeaderboardPage() {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Link href={`/teams/${t.id}`}>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs">
+                            <Button variant="outline" size="sm" className="h-7 text-xs border-[#222222] text-[#a1a1aa] hover:border-white hover:text-white hover:bg-[#1a1a1a]">
                               Профиль
                             </Button>
                           </Link>
                           <Link href={`/scrims/new?targetTeamId=${t.id}`}>
-                            <Button size="sm" className="h-7 text-xs gap-1">
+                            <Button variant="cs" size="sm" className="h-7 text-xs gap-1 font-bold">
                               <Swords className="w-3 h-3" />
                               <span>Вызов</span>
                             </Button>

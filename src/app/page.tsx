@@ -6,15 +6,13 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ScrimCard, ScrimCardData } from '@/components/scrims/ScrimCard';
 import { ScrimFilters, FilterState } from '@/components/scrims/ScrimFilters';
-import { Crosshair, Plus, Users, Zap, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Users, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
+import { getClientCache, setClientCache } from '@/lib/client-cache';
 
 export default function HomePage() {
   const { user } = useUser();
-  const [scrims, setScrims] = useState<ScrimCardData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -24,9 +22,18 @@ export default function HomePage() {
     date: 'all',
   });
 
-  const fetchScrims = useCallback(async () => {
+  const cacheKey = `feed:${page}:${filters.search}:${filters.format}:${filters.platform}:${filters.serverBy}:${filters.date}`;
+  const initialCache = getClientCache<{ scrims: ScrimCardData[]; totalPages: number }>(cacheKey);
+
+  const [scrims, setScrims] = useState<ScrimCardData[]>(initialCache?.scrims || []);
+  const [loading, setLoading] = useState(!initialCache);
+  const [totalPages, setTotalPages] = useState(initialCache?.totalPages || 1);
+
+  const fetchScrims = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading && !getClientCache(cacheKey)) {
+        setLoading(true);
+      }
       const params = new URLSearchParams({
         page: String(page),
         limit: '12',
@@ -43,21 +50,28 @@ export default function HomePage() {
 
       if (data.success && data.data) {
         setScrims(data.data.scrims);
-        setTotalPages(data.data.pagination.totalPages || 1);
+        const pages = data.data.pagination.totalPages || 1;
+        setTotalPages(pages);
+        setClientCache(cacheKey, { scrims: data.data.scrims, totalPages: pages });
       }
     } catch (err) {
       console.error('Failed to load scrims feed:', err);
     } finally {
       setLoading(false);
     }
-  }, [page, filters]);
+  }, [page, filters, cacheKey]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchScrims();
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [fetchScrims]);
+    // If user is searching text, debounce; otherwise fetch immediately
+    if (filters.search) {
+      const timer = setTimeout(() => {
+        fetchScrims(false);
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      fetchScrims(!initialCache);
+    }
+  }, [fetchScrims, filters.search, initialCache]);
 
   const handleResetFilters = () => {
     setFilters({
@@ -73,23 +87,15 @@ export default function HomePage() {
   return (
     <div className="container py-8 space-y-8">
       {/* Hero Banner */}
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 sm:p-10 shadow-2xl shadow-black/50">
-        <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/5 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-white/5 blur-3xl pointer-events-none" />
-
+      <section className="relative overflow-hidden rounded-xl border border-[#222222] bg-[#111111] p-6 sm:p-10 shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="max-w-2xl space-y-3 sm:space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-cs-panel px-3 py-1 text-xs font-semibold text-neutral-200 font-mono">
-              <Zap className="h-3.5 w-3.5 text-white" />
-              <span>Платформа соревновательных праков CS2</span>
-            </div>
-
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-white leading-tight font-mono">
-              ASCENT <span className="text-neutral-400">PRACC</span>
+              ASCENT <span className="text-[#a1a1aa]">PRACC</span>
             </h1>
 
             <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-              Официальная лига и поиск праков (скримов) по Counter-Strike 2. Интерактивное вето карт, живые лобби, выбор серверов и подтверждение результатов.
+              Платформа для поиска праков от ASCENT League
             </p>
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -101,7 +107,7 @@ export default function HomePage() {
               </Link>
 
               <Link href="/teams">
-                <Button variant="outline" size="lg" className="gap-2 text-sm">
+                <Button variant="outline" size="lg" className="gap-2 text-sm border-[#222222] hover:border-white hover:bg-[#1a1a1a]">
                   <Users className="h-4 w-4" />
                   <span>Каталог команд</span>
                 </Button>
@@ -110,14 +116,14 @@ export default function HomePage() {
           </div>
 
           {/* Big Ascent Logo in Hero */}
-          <div className="hidden md:flex items-center justify-center shrink-0 pr-4">
-            <div className="w-36 h-36 rounded-full bg-black border-2 border-border shadow-2xl shadow-black/80 flex items-center justify-center p-1 overflow-hidden">
+          <div className="hidden md:flex items-center justify-center shrink-0 pr-4 relative select-none">
+            <div className="relative w-44 h-40 flex items-center justify-center">
               <Image
                 src="/images/ascent-logo.png"
                 alt="Ascent Pracc"
-                width={140}
-                height={140}
-                className="w-full h-full object-cover rounded-full"
+                width={176}
+                height={160}
+                className="w-full h-full object-contain hover:scale-105 transition-transform duration-300"
                 priority
               />
             </div>
@@ -128,9 +134,8 @@ export default function HomePage() {
       {/* Scrim Feed Header & Filters */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl sm:text-2xl font-black uppercase tracking-wider text-white flex items-center gap-2">
-            <Crosshair className="w-5 h-5 text-white" />
-            <span>Лента открытых заявок</span>
+          <h2 className="text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
+            Лента открытых заявок
           </h2>
 
           <span className="text-xs font-mono text-muted-foreground">

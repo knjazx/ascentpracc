@@ -21,7 +21,12 @@ export async function GET(
   const filePath = path.join(uploadDir, sanitized);
 
   if (!fs.existsSync(filePath)) {
-    return new NextResponse('File not found', { status: 404 });
+    return new NextResponse('File not found', {
+      status: 404,
+      headers: {
+        'Cache-Control': 'public, max-age=86400',
+      },
+    });
   }
 
   const ext = path.extname(sanitized).toLowerCase();

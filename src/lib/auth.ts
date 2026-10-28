@@ -1,10 +1,10 @@
-import { cache } from 'react';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyUserToken } from '@/lib/jwt';
 import { SafeUser } from '@/types';
 import { User, Role } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export const AUTH_COOKIE_NAME = 'cs2_session';
 export const NONCE_COOKIE_NAME = 'cs2_steam_nonce';
@@ -78,7 +78,7 @@ export function sanitizeNextUrl(rawUrl: string | null | undefined): string {
   return rawUrl;
 }
 
-export const getCurrentUser = cache(async (): Promise<SafeUser | null> => {
+export async function getCurrentUser(): Promise<SafeUser | null> {
   try {
     const cookieStore = cookies();
     const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
@@ -90,6 +90,12 @@ export const getCurrentUser = cache(async (): Promise<SafeUser | null> => {
     const payload = await verifyUserToken(token);
     if (!payload || (!payload.userId && !payload.steamId)) {
       return null;
+    }
+
+    const sessionCacheKey = `user:session:${payload.userId || payload.steamId}`;
+    const cachedUser = memoryCache.get<SafeUser>(sessionCacheKey);
+    if (cachedUser) {
+      return cachedUser;
     }
 
     let user: User | null = null;
@@ -132,12 +138,16 @@ export const getCurrentUser = cache(async (): Promise<SafeUser | null> => {
         where: { id: user.id },
         data: { role: Role.ADMIN },
       });
-      return toSafeUser(updated);
+      const safeAdmin = toSafeUser(updated);
+      memoryCache.set(sessionCacheKey, safeAdmin, 60);
+      return safeAdmin;
     }
 
-    return toSafeUser(user);
+    const safe = toSafeUser(user);
+    memoryCache.set(sessionCacheKey, safe, 60);
+    return safe;
   } catch (error) {
     console.error('Error fetching current user:', error);
     return null;
   }
-});
+}

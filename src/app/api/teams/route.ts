@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { teamCreateSchema } from '@/lib/validations/team';
 import { Prisma } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -10,6 +11,12 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '12', 10)));
   const skip = (page - 1) * limit;
+
+  const cacheKey = `teams:${search}:${page}:${limit}`;
+  const cached = memoryCache.get(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   const where: Prisma.TeamWhereInput = search
     ? {
@@ -28,6 +35,12 @@ export async function GET(request: NextRequest) {
       take: limit,
       include: {
         stats: true,
+        ratingsReceived: {
+          select: {
+            punctuality: true,
+            sportsmanship: true,
+          },
+        },
         managers: {
           include: {
             user: {
@@ -51,28 +64,57 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  return NextResponse.json(
-    {
-      success: true,
-      data: {
-        teams: teams.map((team) => ({
-          ...team,
-          totalMatches: team._count.matchesAsTeamA + team._count.matchesAsTeamB,
-        })),
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
+  const payload = {
+    success: true,
+    data: {
+      teams: teams.map((team) => {
+        const ratings = team.ratingsReceived || [];
+        const ratingCount = ratings.length;
+        let avgPunctuality = 0.0;
+        let avgSportsmanship = 0.0;
+        let overallRating = 0.0;
+
+        if (ratingCount > 0) {
+          avgPunctuality = Number(
+            (ratings.reduce((acc, r) => acc + r.punctuality, 0) / ratingCount).toFixed(1)
+          );
+          avgSportsmanship = Number(
+            (ratings.reduce((acc, r) => acc + r.sportsmanship, 0) / ratingCount).toFixed(1)
+          );
+          overallRating = Number(((avgPunctuality + avgSportsmanship) / 2).toFixed(1));
+        }
+
+        const penalty = (team.noShowCount * 20);
+        const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
+
+        const { ratingsReceived, _count, ...restTeam } = team;
+
+        return {
+          ...restTeam,
+          totalMatches: _count.matchesAsTeamA + _count.matchesAsTeamB,
+          ratingCount,
+          avgPunctuality,
+          avgSportsmanship,
+          overallRating,
+          trustFactor,
+        };
+      }),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
     },
-    {
-      headers: {
-        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=15',
-      },
-    }
-  );
+  };
+
+  memoryCache.set(cacheKey, payload, 60);
+
+  return NextResponse.json(payload, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=15',
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -170,6 +212,9 @@ export async function POST(request: NextRequest) {
       });
       return team;
     });
+
+    memoryCache.invalidate('teams:');
+    memoryCache.invalidate('leaderboard:');
 
     return NextResponse.json({ success: true, data: newTeam }, { status: 201 });
   } catch (err: unknown) {

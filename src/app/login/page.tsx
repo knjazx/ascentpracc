@@ -45,25 +45,22 @@ function LoginContent() {
           </div>
         )}
 
-        <Card className="border border-border bg-card shadow-2xl shadow-black/50 relative overflow-hidden">
-          {/* Decorative ambient top line */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-neutral-700 via-white to-neutral-700" />
-
+        <Card className="border border-[#222222] bg-[#111111] shadow-2xl relative overflow-hidden rounded-xl">
           <CardHeader className="text-center pb-4 pt-8">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-black border border-border shadow-lg shadow-black/50 mb-3 overflow-hidden p-0.5">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center mb-3 select-none relative">
               <Image
-                src="/images/ascent-logo.png"
+                src="/images/ascent-icon.png"
                 alt="Ascent Pracc Logo"
                 width={64}
                 height={64}
-                className="w-full h-full object-cover rounded-full"
+                className="w-full h-full object-contain relative"
                 priority
               />
             </div>
-            <CardTitle className="text-2xl font-black uppercase tracking-wider text-foreground font-mono">
-              Вход в <span className="text-white">Ascent Pracc</span>
+            <CardTitle className="text-2xl font-black uppercase tracking-wider text-white font-mono">
+              Вход в Ascent Pracc
             </CardTitle>
-            <CardDescription className="text-muted-foreground text-sm max-w-xs mx-auto">
+            <CardDescription className="text-[#a1a1aa] text-sm max-w-xs mx-auto">
               Авторизуйтесь через официальный Steam для управления командами, поиска скримов и участия в вето матчей.
             </CardDescription>
           </CardHeader>
@@ -72,22 +69,22 @@ function LoginContent() {
             <div className="space-y-3">
               <a href={steamLoginUrl} className="block w-full">
                 <Button
-                  variant="steam"
+                  variant="cs"
                   size="lg"
-                  className="w-full h-12 text-base font-semibold gap-3 shadow-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700"
+                  className="w-full h-12 text-base font-bold gap-3 shadow-sm"
                 >
                   <SteamIcon className="w-5 h-5 fill-current shrink-0" />
                   <span>Войти через Steam</span>
                 </Button>
               </a>
 
-              <p className="text-[11px] text-center text-muted-foreground">
+              <p className="text-[11px] text-center text-[#52525b]">
                 Авторизация безопасна и происходит напрямую на серверах valve steamcommunity.com
               </p>
             </div>
 
             {/* Platform Highlights */}
-            <div className="border-t border-neutral-800 pt-4 space-y-2.5 text-xs text-muted-foreground">
+            <div className="border-t border-[#222222] pt-4 space-y-2.5 text-xs text-[#a1a1aa]">
               <div className="flex items-center gap-2.5">
                 <Zap className="w-4 h-4 text-white shrink-0" />
                 <span>Быстрый матчмейкинг праков с гибким выбором времени</span>
@@ -98,7 +95,7 @@ function LoginContent() {
               </div>
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-white shrink-0" />
-                <span>Защищенные лобби и рейтинговая система доверия команд</span>
+                <span>Система репутации, оценок пунктуальности и защита от неявок</span>
               </div>
             </div>
           </CardContent>

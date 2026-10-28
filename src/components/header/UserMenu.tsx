@@ -17,7 +17,6 @@ import {
   Lock,
 } from 'lucide-react';
 import { SteamIcon } from '@/components/icons/SteamIcon';
-import { getSystemTimezone } from '@/lib/date';
 
 export function UserMenu() {
   const { user, loading, logout } = useUser();
@@ -74,20 +73,15 @@ export function UserMenu() {
         aria-expanded={isOpen}
       >
         <Avatar src={user.avatarUrl} alt={user.nickname} fallback={user.nickname} size="default" />
-        <div className="text-left hidden md:block">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-foreground leading-tight max-w-[120px] truncate">
-              {user.nickname}
-            </span>
-            {user.role === 'ADMIN' && (
-              <Badge variant="admin" className="text-[10px] px-1.5 py-0">
-                ADMIN
-              </Badge>
-            )}
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {user.timezone && user.timezone !== 'SYSTEM' ? user.timezone : getSystemTimezone()}
+        <div className="text-left hidden md:flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-foreground leading-tight max-w-[120px] truncate">
+            {user.nickname}
           </span>
+          {user.role === 'ADMIN' && (
+            <Badge variant="admin" className="text-[10px] px-1.5 py-0">
+              ADMIN
+            </Badge>
+          )}
         </div>
         <ChevronDown
           className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
@@ -102,7 +96,6 @@ export function UserMenu() {
           <div className="px-3 py-2.5 border-b border-border/60 mb-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">Профиль</p>
             <p className="text-sm font-bold text-foreground truncate mt-0.5">{user.nickname}</p>
-            <p className="text-xs text-muted-foreground font-mono truncate">SteamID: {user.steamId}</p>
           </div>
 
           {/* Teams Section */}

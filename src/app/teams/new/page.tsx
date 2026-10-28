@@ -100,27 +100,26 @@ export default function CreateTeamPage() {
     const existingTeam = user.teams[0];
     return (
       <div className="container max-w-lg py-16">
-        <Card className="border-neutral-800 bg-neutral-950/95 shadow-2xl p-6 sm:p-8 text-center space-y-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-neutral-600 via-white to-neutral-600" />
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-white border border-white/20 shadow-lg">
-            <Users className="h-8 w-8" />
+        <Card className="border border-[#222222] bg-[#111111] shadow-2xl p-6 sm:p-8 text-center space-y-6 relative overflow-hidden rounded-xl">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#0a0a0a] text-white border border-[#222222] shadow-sm">
+            <Users className="h-7 w-7" />
           </div>
           <div className="space-y-2">
             <h2 className="text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
               Лимит команд исчерпан
             </h2>
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-[#a1a1aa]">
               На платформе действует правило: один игрок может состоять только в <span className="text-white font-bold">1 команде</span>.
             </p>
           </div>
 
-          <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/60 flex items-center justify-between gap-3 text-left">
+          <div className="p-4 rounded-xl border border-[#222222] bg-[#0a0a0a] flex items-center justify-between gap-3 text-left">
             <div>
               <p className="font-bold text-white text-base">{existingTeam.name}</p>
-              <p className="text-xs font-mono text-neutral-400 font-semibold">[{existingTeam.tag}]</p>
+              <p className="text-xs font-mono text-[#a1a1aa] font-semibold">[{existingTeam.tag}]</p>
             </div>
             <Link href={`/teams/${existingTeam.id}`}>
-              <Button variant="outline" size="sm" className="text-xs font-medium hover:border-white">
+              <Button variant="outline" size="sm" className="text-xs font-medium border-[#222222] hover:border-white">
                 Профиль команды
               </Button>
             </Link>
@@ -140,25 +139,23 @@ export default function CreateTeamPage() {
 
   return (
     <div className="container max-w-2xl py-10">
-      <Card className="border-neutral-800 bg-neutral-950/95 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-neutral-600 via-white to-neutral-600" />
-
+      <Card className="border border-[#222222] bg-[#111111] shadow-2xl relative overflow-hidden rounded-xl">
         <CardHeader className="text-center pb-4 pt-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white border border-white/20 mb-3 shadow-lg">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#0a0a0a] text-white border border-[#222222] mb-3 shadow-sm">
             <Users className="h-7 w-7" />
           </div>
           <CardTitle className="text-2xl font-black uppercase tracking-wider text-white">
             Создание команды
           </CardTitle>
-          <CardDescription className="text-neutral-400 text-sm max-w-md mx-auto">
+          <CardDescription className="text-[#a1a1aa] text-sm max-w-md mx-auto">
             Команда выступает карточкой для поиска праков. Вы станете ее владельцем и сможете управлять заявками и со-капитанами.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="pb-8">
           {error && (
-            <div className="mb-6 flex items-start gap-3 rounded-lg border border-neutral-700 bg-neutral-900 p-3.5 text-neutral-200 text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-white" />
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-red-300 text-sm">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />
               <span>{error}</span>
             </div>
           )}
@@ -168,7 +165,7 @@ export default function CreateTeamPage() {
             <div className="flex flex-col items-center justify-center space-y-3 pb-2">
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="relative w-24 h-24 rounded-2xl border-2 border-dashed border-neutral-700 hover:border-white bg-neutral-900 cursor-pointer flex flex-col items-center justify-center overflow-hidden transition-all group"
+                className="relative w-24 h-24 rounded-xl border-2 border-dashed border-[#222222] hover:border-white bg-[#0a0a0a] cursor-pointer flex flex-col items-center justify-center overflow-hidden transition-all group"
               >
                 {logoUrl ? (
                   <Image
@@ -181,8 +178,8 @@ export default function CreateTeamPage() {
                   />
                 ) : (
                   <>
-                    <Upload className="w-6 h-6 text-neutral-400 group-hover:text-white transition-colors" />
-                    <span className="text-[10px] text-neutral-400 mt-1 uppercase font-semibold">
+                    <Upload className="w-6 h-6 text-[#52525b] group-hover:text-white transition-colors" />
+                    <span className="text-[10px] text-[#52525b] mt-1 uppercase font-semibold">
                       {uploading ? 'Загрузка...' : 'Логотип'}
                     </span>
                   </>
@@ -196,7 +193,7 @@ export default function CreateTeamPage() {
                 className="hidden"
                 onChange={handleLogoUpload}
               />
-              <p className="text-[11px] text-neutral-400 text-center">
+              <p className="text-[11px] text-[#a1a1aa] text-center">
                 PNG, JPEG или WEBP до 2 МБ. Нажмите для выбора.
               </p>
             </div>
@@ -204,7 +201,7 @@ export default function CreateTeamPage() {
             {/* Name & Tag Inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#a1a1aa]">
                   Название команды *
                 </label>
                 <Input
@@ -214,13 +211,13 @@ export default function CreateTeamPage() {
                   onChange={(e) => setName(e.target.value)}
                   minLength={2}
                   maxLength={32}
-                  className="bg-neutral-900 border-neutral-800"
+                  className="bg-[#0a0a0a] border-[#222222] text-white focus-visible:border-white"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#a1a1aa]">
                   Тег команды *
                 </label>
                 <Input
@@ -230,7 +227,7 @@ export default function CreateTeamPage() {
                   onChange={(e) => setTag(e.target.value.toUpperCase())}
                   minLength={2}
                   maxLength={8}
-                  className="font-mono uppercase font-bold bg-neutral-900 border-neutral-800"
+                  className="font-mono uppercase font-bold bg-[#0a0a0a] border-[#222222] text-white focus-visible:border-white"
                   required
                 />
               </div>
@@ -238,7 +235,7 @@ export default function CreateTeamPage() {
 
             {/* Description */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#a1a1aa]">
                 Описание команды
               </label>
               <textarea
@@ -247,18 +244,18 @@ export default function CreateTeamPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={500}
-                className="flex w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white resize-none"
+                className="flex w-full rounded-md border border-[#222222] bg-[#0a0a0a] px-3 py-2 text-sm text-white placeholder:text-[#52525b] focus-visible:outline-none focus-visible:border-white resize-none"
               />
             </div>
 
             {/* Average ELO */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#a1a1aa] flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-white" />
                   <span>Средний Faceit ELO (AVG ELO)</span>
                 </label>
-                <span className="text-[11px] text-neutral-500">Необязательно</span>
+                <span className="text-[11px] text-[#52525b]">Необязательно</span>
               </div>
               <div className="relative">
                 <Input
@@ -268,13 +265,13 @@ export default function CreateTeamPage() {
                   placeholder="например: 2150"
                   value={avgElo}
                   onChange={(e) => setAvgElo(e.target.value)}
-                  className="font-mono text-white placeholder:text-neutral-500 pr-16 bg-neutral-900 border-neutral-800"
+                  className="font-mono text-white placeholder:text-[#52525b] pr-16 bg-[#0a0a0a] border-[#222222] focus-visible:border-white"
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-neutral-400 uppercase pointer-events-none">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-[#a1a1aa] uppercase pointer-events-none">
                   ELO
                 </div>
               </div>
-              <p className="text-[11px] text-neutral-400">
+              <p className="text-[11px] text-[#52525b]">
                 Укажите средний Faceit ELO ростера (от 100 до 5000). Помогает подбирать равных соперников на праки.
               </p>
             </div>

@@ -27,9 +27,22 @@ import {
   Globe,
   Gamepad2,
   Quote,
+  MapPin,
 } from 'lucide-react';
+
+const ALL_POOL_MAPS = [
+  { id: 'de_dust2', name: 'Dust2', image: '/maps/de_dust2.webp' },
+  { id: 'de_mirage', name: 'Mirage', image: '/maps/de_mirage.webp' },
+  { id: 'de_nuke', name: 'Nuke', image: '/maps/de_nuke.webp' },
+  { id: 'de_ancient', name: 'Ancient', image: '/maps/de_ancient.webp' },
+  { id: 'de_inferno', name: 'Inferno', image: '/maps/de_inferno.webp' },
+  { id: 'de_anubis', name: 'Anubis', image: '/maps/de_anubis.webp' },
+  { id: 'de_cache', name: 'Cache', image: '/maps/de_cache.webp' },
+  { id: 'de_vertigo', name: 'Vertigo', image: '/maps/de_vertigo.webp' },
+];
 import { SERVER_LOCATION_MAP } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
+import { getClientCache, setClientCache, clearClientCache } from '@/lib/client-cache';
 
 interface ScrimDetail {
   id: string;
@@ -43,6 +56,14 @@ interface ScrimDetail {
   status: 'OPEN' | 'MATCHED' | 'CANCELLED' | 'EXPIRED';
   expiresAt: string;
   isAuthor: boolean;
+  targetTeam?: {
+    id: string;
+    name: string;
+    tag: string;
+    logoUrl: string | null;
+    avgElo: number | null;
+  } | null;
+  isTargetManager?: boolean;
   team: {
     id: string;
     name: string;
@@ -86,12 +107,15 @@ export default function ScrimDetailPage() {
   const { user } = useUser();
   const userTimezone = user?.timezone || 'Europe/Kyiv';
 
-  const [scrim, setScrim] = useState<ScrimDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `scrim:detail:${id}`;
+  const initialCache = getClientCache<ScrimDetail>(cacheKey);
+
+  const [scrim, setScrim] = useState<ScrimDetail | null>(initialCache);
+  const [loading, setLoading] = useState(!initialCache);
 
   // Response form state (for opponents)
   const [selectedTeamId, setSelectedTeamId] = useState('');
-  const [selectedSlotId, setSelectedSlotId] = useState('');
+  const [selectedSlotId, setSelectedSlotId] = useState(initialCache?.slots[0]?.id || '');
   const [proposeCustomTime, setProposeCustomTime] = useState(false);
   const [customDate, setCustomDate] = useState('');
   const [customTime, setCustomTime] = useState('20:00');
@@ -104,12 +128,15 @@ export default function ScrimDetailPage() {
 
   const fetchScrim = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!getClientCache(cacheKey)) {
+        setLoading(true);
+      }
       const res = await fetch(`/api/scrims/${id}`);
       const data = await res.json();
       if (data.success && data.data) {
         setScrim(data.data);
-        if (data.data.slots.length > 0) {
+        setClientCache(cacheKey, data.data);
+        if (data.data.slots.length > 0 && !selectedSlotId) {
           setSelectedSlotId(data.data.slots[0].id);
         }
       }
@@ -118,7 +145,7 @@ export default function ScrimDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, cacheKey, selectedSlotId]);
 
   useEffect(() => {
     fetchScrim();
@@ -223,6 +250,8 @@ export default function ScrimDetailPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Ошибка при отзыве отклика');
       }
+      clearClientCache(`scrim:detail:${id}`);
+      clearClientCache('feed:');
       await fetchScrim();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Ошибка');
@@ -239,9 +268,62 @@ export default function ScrimDetailPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Ошибка при отмене заявки');
       }
-      await fetchScrim();
+      clearClientCache(`scrim:detail:${id}`);
+      clearClientCache('feed:');
+      setScrim((prev) => (prev ? { ...prev, status: 'CANCELLED' } : null));
+      router.push('/');
+      router.refresh();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Ошибка');
+    }
+  };
+
+  const handleAcceptChallenge = async () => {
+    if (!selectedSlotId) {
+      setError('Выберите время матча');
+      return;
+    }
+    setActionLoading('accept-challenge');
+    setError(null);
+    try {
+      const res = await fetch(`/api/challenges/${id}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotId: selectedSlotId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Ошибка при принятии вызова');
+      }
+      clearClientCache(`scrim:detail:${id}`);
+      clearClientCache('feed:');
+      router.push(`/lobby/${data.data.matchId}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeclineChallenge = async () => {
+    if (!confirm('Вы уверены, что хотите отклонить/отозвать этот вызов?')) return;
+    setActionLoading('decline-challenge');
+    setError(null);
+    try {
+      const res = await fetch(`/api/challenges/${id}/decline`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Ошибка при отклонении вызова');
+      }
+      clearClientCache(`scrim:detail:${id}`);
+      clearClientCache('feed:');
+      await fetchScrim();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -277,23 +359,25 @@ export default function ScrimDetailPage() {
     OTHER: 'Другой',
   };
 
+  const isChallenge = Boolean(scrim.targetTeam);
+
   const statusBadges = {
     OPEN: (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold uppercase tracking-wider">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        Открыта
+        {isChallenge ? 'Вызов ожидает ответа' : 'Открыта'}
       </span>
     ),
     MATCHED: (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-xs font-bold uppercase tracking-wider">
         <Swords className="w-3.5 h-3.5" />
-        Матч назначен
+        {isChallenge ? 'Вызов принят' : 'Матч назначен'}
       </span>
     ),
     CANCELLED: (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs font-bold uppercase tracking-wider">
         <XCircle className="w-3.5 h-3.5" />
-        Отменена
+        {isChallenge ? 'Отклонен / Отозван' : 'Отменена'}
       </span>
     ),
     EXPIRED: (
@@ -332,16 +416,57 @@ export default function ScrimDetailPage() {
         </div>
       )}
 
-      {/* Main Scrim Card */}
-      <Card className="border border-neutral-800 bg-neutral-950/70 shadow-2xl shadow-black/60 relative overflow-hidden rounded-2xl">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-neutral-700 via-white to-neutral-700" />
+      {/* Direct Challenge Banner */}
+      {scrim.targetTeam && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-xl border border-white/20 bg-[#141414] shadow-xl shadow-black/40 text-white relative overflow-hidden">
+          <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-white" />
+          <div className="flex items-center gap-3.5 pl-1">
+            <div className="w-11 h-11 rounded-xl bg-[#0a0a0a] border border-[#333333] flex items-center justify-center shrink-0 shadow-md">
+              <Swords className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[11px] font-bold text-white uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded border border-white/20">
+                  Прямой вызов
+                </span>
+                <span className="font-bold text-base text-foreground">
+                  Соперник:{' '}
+                  <Link href={`/teams/${scrim.targetTeam.id}`} className="text-white hover:underline">
+                    [{scrim.targetTeam.tag}] {scrim.targetTeam.name}
+                  </Link>
+                </span>
+              </div>
+              <p className="text-xs text-[#a1a1aa] mt-1">
+                {scrim.isAuthor
+                  ? 'Вы бросили прямой личный вызов. Заявка скрыта из общей ленты и направлена напрямую руководству соперника.'
+                  : scrim.isTargetManager
+                  ? 'Команда бросила вашей команде прямой вызов! Выберите удобный слот времени и примите матч.'
+                  : 'Это приватный прямой вызов между двумя командами.'}
+              </p>
+            </div>
+          </div>
 
-        <CardHeader className="pb-5 pt-7 px-6 sm:px-8 border-b border-neutral-800/80">
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            <Link
+              href={`/teams/${scrim.targetTeam.id}`}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0a0a0a] border border-[#222222] hover:border-white transition-colors"
+            >
+              <span className="text-xs font-mono font-bold text-white">[{scrim.targetTeam.tag}]</span>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Main Scrim Card */}
+      <Card className="border border-[#222222] bg-[#111111] shadow-xl relative overflow-hidden rounded-xl">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white to-transparent" />
+
+        <CardHeader className="pb-5 pt-7 px-6 sm:px-8 border-b border-[#222222]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             {/* Host Team Info */}
             <div className="flex items-center gap-4">
               <Link href={`/teams/${scrim.team.id}`}>
-                <div className="relative w-16 h-16 rounded-2xl bg-neutral-900 border border-neutral-700/80 flex items-center justify-center overflow-hidden shrink-0 shadow-lg group hover:border-neutral-500 transition-colors">
+                <div className="relative w-16 h-16 rounded-xl bg-[#0a0a0a] border border-[#222222] flex items-center justify-center overflow-hidden shrink-0 shadow-lg group hover:border-white transition-colors">
                   {scrim.team.logoUrl ? (
                     <Image
                       src={scrim.team.logoUrl}
@@ -367,12 +492,12 @@ export default function ScrimDetailPage() {
                   >
                     {scrim.team.name}
                   </Link>
-                  <span className="text-xs font-mono font-bold text-neutral-300 bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700">
+                  <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#161616] px-2 py-0.5 rounded border border-[#222222]">
                     [{scrim.team.tag}]
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
-                  <span className="text-neutral-300 font-semibold">
+                  <span className="text-[#10b981] font-semibold">
                     Винрейт: {scrim.team.stats?.winRate ? Math.round(scrim.team.stats.winRate * 100) : 0}%
                   </span>
                   <span>•</span>
@@ -388,10 +513,10 @@ export default function ScrimDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCancelScrim}
-                  className="text-xs font-semibold text-rose-400 border-rose-500/30 hover:bg-rose-500/10 hover:border-rose-500/60 transition-colors"
+                  onClick={isChallenge ? handleDeclineChallenge : handleCancelScrim}
+                  className="text-xs font-semibold text-[#ef4444] border-[#ef4444]/30 hover:bg-[#ef4444]/10 hover:border-[#ef4444]/60 transition-colors"
                 >
-                  Отменить заявку
+                  {isChallenge ? 'Отозвать вызов' : 'Отменить заявку'}
                 </Button>
               )}
             </div>
@@ -401,45 +526,45 @@ export default function ScrimDetailPage() {
         <CardContent className="space-y-6 p-6 sm:p-8">
           {/* Key Attributes: 4 perfectly balanced, equal-height metric tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+            <div className="p-3.5 rounded-lg border border-[#222222] bg-[#0a0a0a] flex flex-col justify-between hover:border-white transition-colors">
               <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
                 <span>Формат</span>
-                <Swords className="w-3.5 h-3.5 text-neutral-400" />
+                <Swords className="w-3.5 h-3.5 text-white" />
               </div>
               <p className="font-mono font-black text-white text-base mt-2">{scrim.format}</p>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+            <div className="p-3.5 rounded-lg border border-[#222222] bg-[#0a0a0a] flex flex-col justify-between hover:border-white transition-colors">
               <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
                 <span>Платформа</span>
-                <Gamepad2 className="w-3.5 h-3.5 text-neutral-400" />
+                <Gamepad2 className="w-3.5 h-3.5 text-white" />
               </div>
               <p className="font-mono font-bold text-white text-base mt-2 truncate">
                 {platformLabels[scrim.platform || 'CYBERSHOCK'] || scrim.platform || 'Cybershock'}
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+            <div className="p-3.5 rounded-lg border border-[#222222] bg-[#0a0a0a] flex flex-col justify-between hover:border-white transition-colors">
               <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
                 <span>Уровень</span>
-                <Crosshair className="w-3.5 h-3.5 text-neutral-400" />
+                <Crosshair className="w-3.5 h-3.5 text-white" />
               </div>
               <p className="font-mono font-bold text-white text-base mt-2 truncate">{scrim.level || 'Любой'}</p>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+            <div className="p-3.5 rounded-lg border border-[#222222] bg-[#0a0a0a] flex flex-col justify-between hover:border-white transition-colors">
               <div className="flex items-center justify-between text-muted-foreground text-xs font-mono font-semibold uppercase tracking-wider">
                 <span>Откликов</span>
-                <MessageSquare className="w-3.5 h-3.5 text-neutral-400" />
+                <MessageSquare className="w-3.5 h-3.5 text-white" />
               </div>
               <p className="font-mono font-black text-white text-base mt-2">{scrim.responses.length}</p>
             </div>
           </div>
 
           {/* Dedicated Server Locations Section (Horizontal Tag Bar) */}
-          <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-3">
+          <div className="p-4 rounded-lg border border-[#222222] bg-[#0a0a0a] space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#a1a1aa] uppercase tracking-wider">
                 <Globe className="w-4 h-4 text-white" />
                 <span>Локации серверов</span>
               </div>
@@ -457,7 +582,7 @@ export default function ScrimDetailPage() {
                   return (
                     <div
                       key={city}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-xs font-medium text-neutral-200 hover:border-neutral-500 transition-colors shadow-sm"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111111] border border-[#222222] text-xs font-medium text-white hover:border-white transition-colors shadow-sm"
                     >
                       {loc && <FlagIcon country={loc.country} size={16} />}
                       <span>{city}</span>
@@ -465,7 +590,7 @@ export default function ScrimDetailPage() {
                   );
                 })
               ) : (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-xs font-medium text-neutral-300 font-mono">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111111] border border-[#222222] text-xs font-medium text-[#a1a1aa] font-mono">
                   <span>🤝 {serverLabels[scrim.serverBy] || 'По договоренности'}</span>
                 </div>
               )}
@@ -473,10 +598,10 @@ export default function ScrimDetailPage() {
           </div>
 
           {/* Slots List */}
-          <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
+          <div className="p-4 rounded-lg border border-[#222222] bg-[#0a0a0a] space-y-3">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#a1a1aa] uppercase tracking-wider">
               <Clock className="w-4 h-4 text-white" />
-              <span>Предложенные слоты ({scrim.slots.length})</span>
+              <span>Предложенное время ({scrim.slots.length})</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -485,16 +610,16 @@ export default function ScrimDetailPage() {
                 return (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between p-3.5 rounded-lg border border-neutral-800 bg-neutral-900/90 text-xs font-mono hover:border-neutral-700 transition-colors"
+                    className="flex items-center justify-between p-3.5 rounded-md border border-[#222222] bg-[#111111] text-xs font-mono hover:border-white transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-white text-sm">{dateStr}</span>
                       <span className="text-neutral-500">в</span>
-                      <span className="font-black text-white text-sm px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700">
+                      <span className="font-black text-white text-sm px-2 py-0.5 rounded bg-[#0a0a0a] border border-[#222222]">
                         {timeStr}
                       </span>
                     </div>
-                    <span className="text-[11px] font-semibold text-neutral-400 bg-neutral-800/60 px-2 py-1 rounded">
+                    <span className="text-[11px] font-semibold text-[#a1a1aa] bg-[#0a0a0a] border border-[#222222] px-2 py-1 rounded">
                       {relativeStr}
                     </span>
                   </div>
@@ -503,35 +628,93 @@ export default function ScrimDetailPage() {
             </div>
           </div>
 
-          {/* Excluded Maps */}
-          {scrim.excludedMaps.length > 0 && (
-            <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
-                <Ban className="w-4 h-4 text-rose-400" />
-                <span>Исключенные организатором карты ({scrim.excludedMaps.length})</span>
+          {/* Map Pool */}
+          <div className="p-4 rounded-xl border border-[#2a2a2a] bg-[#0c0c0c] space-y-3 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider border-b border-[#222222] pb-3">
+              <div className="flex items-center gap-2 text-white">
+                <MapPin className="w-4 h-4 text-white" />
+                <span>Маппул встречи</span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {scrim.excludedMaps.map((map) => (
-                  <span
-                    key={map}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/30 text-xs font-mono font-bold uppercase tracking-wider"
-                  >
-                    <Ban className="w-3 h-3 text-rose-400" />
-                    <span>{map.replace('de_', '')}</span>
-                  </span>
-                ))}
+              <div className="flex items-center gap-2 text-[11px] text-[#a1a1aa]">
+                <span className="text-white font-bold">{ALL_POOL_MAPS.length - scrim.excludedMaps.length} в пуле</span>
+                {scrim.excludedMaps.length > 0 && (
+                  <>
+                    <span>•</span>
+                    <span className="text-red-400 font-bold">{scrim.excludedMaps.length} забанено</span>
+                  </>
+                )}
               </div>
             </div>
-          )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
+              {ALL_POOL_MAPS.map((map) => {
+                const isExcluded = scrim.excludedMaps.includes(map.id);
+                return (
+                  <div
+                    key={map.id}
+                    className={`relative flex flex-col items-center p-2 rounded-xl border transition-all select-none ${
+                      isExcluded
+                        ? 'bg-red-950/25 border-2 border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
+                        : 'bg-[#181818] border border-[#333333]'
+                    }`}
+                  >
+                    {/* Map Thumbnail */}
+                    <div
+                      className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border ${
+                        isExcluded ? 'border-red-500/40' : 'border-white/10'
+                      }`}
+                    >
+                      <img
+                        src={map.image}
+                        alt={map.name}
+                        className={`w-full h-full object-cover ${
+                          isExcluded ? 'grayscale opacity-40 scale-95' : ''
+                        }`}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      {isExcluded && (
+                        <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                          <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
+                          <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
+                            БАН
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Map Name */}
+                    <span
+                      className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
+                        isExcluded ? 'text-red-400 line-through' : 'text-white'
+                      }`}
+                    >
+                      {map.name}
+                    </span>
+
+                    {/* Status Badge */}
+                    <span
+                      className={`text-[10px] font-mono font-semibold ${
+                        isExcluded ? 'text-red-400 uppercase' : 'text-[#888888]'
+                      }`}
+                    >
+                      {isExcluded ? 'Забанена' : 'В пуле'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Comment */}
           {scrim.comment && (
-            <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
-                <Quote className="w-3.5 h-3.5 text-neutral-400" />
+            <div className="p-4 rounded-lg border border-[#222222] bg-[#0a0a0a] space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#a1a1aa] uppercase tracking-wider">
+                <Quote className="w-3.5 h-3.5 text-white" />
                 <span>Комментарий организатора</span>
               </div>
-              <p className="text-sm text-neutral-200 italic pl-4 border-l-2 border-neutral-700">
+              <p className="text-sm text-neutral-200 italic pl-4 border-l-2 border-white/60">
                 «{scrim.comment}»
               </p>
             </div>
@@ -539,8 +722,57 @@ export default function ScrimDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Responses Management (Author View) */}
-      {scrim.isAuthor && (
+      {/* Author View for Direct Challenge */}
+      {scrim.isAuthor && scrim.targetTeam && (
+        <Card className="border border-[#222222] bg-[#111111] shadow-xl rounded-xl">
+          <CardHeader className="pb-4 border-b border-[#222222]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Swords className="w-5 h-5 text-white shrink-0" />
+                <div>
+                  <CardTitle className="text-lg">Статус прямого вызова</CardTitle>
+                  <CardDescription className="text-xs">
+                    Вызов направлен капитану и менеджерам команды{' '}
+                    <span className="text-white font-semibold">[{scrim.targetTeam.tag}] {scrim.targetTeam.name}</span>
+                  </CardDescription>
+                </div>
+              </div>
+              {scrim.status === 'OPEN' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={actionLoading === 'decline-challenge'}
+                  onClick={handleDeclineChallenge}
+                  className="text-xs text-[#ef4444] border-[#ef4444]/30 hover:bg-[#ef4444]/10 hover:border-[#ef4444]/60"
+                >
+                  {actionLoading === 'decline-challenge' ? 'Отмена...' : 'Отозвать вызов'}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-5">
+            {scrim.status === 'OPEN' ? (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-[#0a0a0a] border border-[#222222] text-xs font-mono text-[#a1a1aa]">
+                <Clock className="w-4 h-4 text-white shrink-0 animate-pulse" />
+                <span>Ожидает ответа от соперника. Капитан команды уведомлен лично в системе.</span>
+              </div>
+            ) : scrim.status === 'MATCHED' ? (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Вызов принят! Матч сформирован и ожидает в лобби.</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-mono text-rose-400">
+                <XCircle className="w-4 h-4 shrink-0" />
+                <span>Вызов отклонен или отозван.</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Responses Management (Author View for standard open scrims) */}
+      {scrim.isAuthor && !scrim.targetTeam && (
         <div className="space-y-4">
           <h2 className="text-xl font-black uppercase tracking-wider text-foreground flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-white" />
@@ -548,7 +780,7 @@ export default function ScrimDetailPage() {
           </h2>
 
           {scrim.responses.length === 0 ? (
-            <div className="p-8 text-center rounded-2xl border border-neutral-800 bg-neutral-950/70 shadow-2xl text-muted-foreground text-sm font-mono">
+            <div className="p-8 text-center rounded-xl border border-[#222222] bg-[#111111] shadow-xl text-[#a1a1aa] text-sm font-mono">
               Пока нет откликов от соперников. Ссылка на заявку активна в ленте.
             </div>
           ) : (
@@ -567,12 +799,12 @@ export default function ScrimDetailPage() {
                 return (
                   <div
                     key={resp.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border border-neutral-800 bg-neutral-950/70 shadow-xl shadow-black/40 hover:border-neutral-700 transition-all"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-[#222222] bg-[#111111] shadow-lg hover:border-white transition-all"
                   >
                     {/* Responding Team info */}
                     <div className="flex items-center gap-3.5">
                       <Link href={`/teams/${resp.team.id}`}>
-                        <div className="relative w-12 h-12 rounded-xl bg-neutral-900 border border-neutral-700 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+                        <div className="relative w-12 h-12 rounded-lg bg-[#0a0a0a] border border-[#222222] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
                           {resp.team.logoUrl ? (
                             <Image
                               src={resp.team.logoUrl}
@@ -598,13 +830,13 @@ export default function ScrimDetailPage() {
                           >
                             {resp.team.name}
                           </Link>
-                          <span className="text-xs font-mono font-bold text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
+                          <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#161616] px-1.5 py-0.5 rounded border border-[#222222]">
                             [{resp.team.tag}]
                           </span>
                         </div>
-                        <p className="text-xs font-mono text-neutral-300 mt-0.5">{slotInfo}</p>
+                        <p className="text-xs font-mono text-white mt-0.5">{slotInfo}</p>
                         {resp.message && (
-                          <p className="text-xs text-neutral-400 italic mt-0.5">
+                          <p className="text-xs text-[#a1a1aa] italic mt-0.5 bg-[#0a0a0a] px-2 py-0.5 rounded border-l-2 border-white/60">
                             «{resp.message}»
                           </p>
                         )}
@@ -630,7 +862,7 @@ export default function ScrimDetailPage() {
                             size="sm"
                             disabled={actionLoading === resp.id}
                             onClick={() => handleDeclineResponse(resp.id)}
-                            className="text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 hover:border-rose-500/60"
+                            className="text-xs text-[#ef4444] border-[#ef4444]/30 hover:bg-[#ef4444]/10 hover:border-[#ef4444]/60"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             <span>Отклонить</span>
@@ -658,16 +890,111 @@ export default function ScrimDetailPage() {
         </div>
       )}
 
-      {/* Opponent View: Respond to Scrim Form */}
-      {!scrim.isAuthor && scrim.status === 'OPEN' && (
-        <Card className="border border-neutral-800 bg-neutral-950/70 shadow-2xl shadow-black/60 rounded-2xl">
-          <CardHeader className="pb-3 border-b border-neutral-800/80">
+      {/* Opponent View: Direct Challenge Decision Card */}
+      {!scrim.isAuthor && scrim.targetTeam && (
+        <Card className="border border-[#222222] bg-[#111111] shadow-xl rounded-xl overflow-hidden">
+          <CardHeader className="pb-4 border-b border-[#222222]">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Swords className="w-5 h-5 text-white" />
+              <span>Прямой вызов вашей команде [{scrim.targetTeam.tag}]</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Команда <span className="text-white font-semibold">{scrim.team.name}</span> бросила вам персональный вызов.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-5">
+            {scrim.status !== 'OPEN' ? (
+              <div className="p-4 rounded-xl bg-[#0a0a0a] border border-[#222222] text-xs font-mono text-[#a1a1aa] text-center">
+                {scrim.status === 'MATCHED'
+                  ? 'Вызов уже принят. Перейдите в лобби матча.'
+                  : 'Этот вызов больше не активен.'}
+              </div>
+            ) : !scrim.isTargetManager ? (
+              <div className="p-5 rounded-xl bg-[#0a0a0a] border border-[#222222] space-y-2 text-center">
+                <p className="text-sm font-bold text-foreground">Приватный вызов</p>
+                <p className="text-xs text-[#a1a1aa] font-mono">
+                  Принять или отклонить этот вызов могут только капитан или менеджеры команды [{scrim.targetTeam.tag}].
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
+                    Выберите предложенное время встречи:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {scrim.slots.map((s) => {
+                      const { dateStr, timeStr } = formatSlotDateTime(s.startsAt, userTimezone);
+                      return (
+                        <label
+                          key={s.id}
+                          className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                            selectedSlotId === s.id
+                              ? 'border-white bg-white/10 text-foreground ring-1 ring-white/20'
+                              : 'border-neutral-800 bg-neutral-900/60 text-muted-foreground hover:text-foreground hover:border-neutral-700'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="challenge_slot"
+                            checked={selectedSlotId === s.id}
+                            onChange={() => setSelectedSlotId(s.id)}
+                            className="accent-white"
+                          />
+                          <div>
+                            <span className="text-xs font-mono font-bold block text-white">
+                              {dateStr}
+                            </span>
+                            <span className="text-xs font-mono text-[#a1a1aa]">
+                              в {timeStr}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                  <Button
+                    variant="cs"
+                    size="lg"
+                    disabled={actionLoading === 'accept-challenge' || !selectedSlotId}
+                    onClick={handleAcceptChallenge}
+                    className="w-full sm:w-auto flex-1 gap-2 font-bold"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>
+                      {actionLoading === 'accept-challenge' ? 'Создание матча...' : 'Принять вызов и начать матч'}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    disabled={actionLoading === 'decline-challenge'}
+                    onClick={handleDeclineChallenge}
+                    className="w-full sm:w-auto text-[#ef4444] border-[#ef4444]/30 hover:bg-[#ef4444]/10 hover:border-[#ef4444]/60 font-semibold"
+                  >
+                    <XCircle className="w-4 h-4 mr-1.5" />
+                    <span>Отклонить вызов</span>
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Opponent View: Respond to Scrim Form (only for standard open scrims) */}
+      {!scrim.isAuthor && !scrim.targetTeam && scrim.status === 'OPEN' && (
+        <Card className="border border-[#222222] bg-[#111111] shadow-xl rounded-xl">
+          <CardHeader className="pb-3 border-b border-[#222222]">
             <CardTitle className="text-lg flex items-center gap-2">
               <Send className="w-4 h-4 text-white" />
               <span>Откликнуться на прак</span>
             </CardTitle>
             <CardDescription className="text-xs">
-              Выберите свою команду и слот, чтобы предложить матч организатору.
+              Выберите свою команду и время, чтобы предложить матч организатору.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-5">
@@ -716,7 +1043,7 @@ export default function ScrimDetailPage() {
                       onClick={() => setProposeCustomTime(!proposeCustomTime)}
                       className="text-white hover:underline font-bold"
                     >
-                      {proposeCustomTime ? 'Выбрать слот организатора' : 'Предложить другое время'}
+                      {proposeCustomTime ? 'Выбрать время организатора' : 'Предложить другое время'}
                     </button>
                   </div>
 
@@ -798,7 +1125,7 @@ export default function ScrimDetailPage() {
       )}
 
       {/* Opponent's Existing Response Status */}
-      {!scrim.isAuthor && scrim.responses.length > 0 && (
+      {!scrim.isAuthor && !scrim.targetTeam && scrim.responses.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-bold text-foreground">Ваш статус отклика на эту заявку:</h3>
           {scrim.responses.map((resp) => (

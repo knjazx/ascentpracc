@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +11,12 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const skip = (page - 1) * limit;
+
+    const cacheKey = `leaderboard:${minMatches}:${sortBy}:${page}:${limit}`;
+    const cached = memoryCache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
 
     const where: Prisma.TeamWhereInput = {
       ...(minMatches > 0
@@ -73,8 +80,8 @@ export async function GET(request: NextRequest) {
     // Calculate average ratings for each team
     const enriched = teams.map((t, idx) => {
       const ratingCount = t.ratingsReceived.length;
-      let avgPunctuality = 5.0;
-      let avgSportsmanship = 5.0;
+      let avgPunctuality = 0.0;
+      let avgSportsmanship = 0.0;
 
       if (ratingCount > 0) {
         const sumP = t.ratingsReceived.reduce((acc, r) => acc + r.punctuality, 0);
@@ -109,25 +116,26 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          teams: enriched,
-          pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-          },
+    const payload = {
+      success: true,
+      data: {
+        teams: enriched,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
       },
-      {
-        headers: {
-          'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
-        },
-      }
-    );
+    };
+
+    memoryCache.set(cacheKey, payload, 60);
+
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+      },
+    });
   } catch (err: unknown) {
     console.error('Error in GET /api/leaderboard:', err);
     return NextResponse.json(
