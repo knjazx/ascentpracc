@@ -28,6 +28,7 @@ export async function GET(
           logoUrl: true,
           discordInvite: true,
           noShowCount: true,
+          avgElo: true,
           stats: {
             select: {
               winRate: true,
@@ -106,11 +107,11 @@ export async function GET(
     }
   }
 
-  // If author manager, include all responses.
+  // If author manager, include all responses with avgElo and computed trustFactor.
   // Otherwise, include only responses from teams managed by current user.
   let responses: unknown[] = [];
   if (isAuthorManager) {
-    responses = await prisma.scrimResponse.findMany({
+    const rawResponses = await prisma.scrimResponse.findMany({
       where: { requestId: id },
       include: {
         team: {
@@ -120,6 +121,7 @@ export async function GET(
             tag: true,
             logoUrl: true,
             noShowCount: true,
+            avgElo: true,
             stats: {
               select: { winRate: true, matchesPlayed: true },
             },
@@ -128,6 +130,32 @@ export async function GET(
         slot: true,
       },
       orderBy: { createdAt: 'desc' },
+    });
+
+    const teamIds = rawResponses.map((r) => r.team.id);
+    const reports = await prisma.report.groupBy({
+      by: ['targetId'],
+      where: {
+        targetType: 'TEAM',
+        targetId: { in: teamIds },
+        status: { in: ['PENDING', 'REVIEWED', 'RESOLVED'] },
+      },
+      _count: true,
+    });
+    const reportsMap = new Map(reports.map((r) => [r.targetId, r._count]));
+
+    responses = rawResponses.map((r) => {
+      const activeReports = reportsMap.get(r.team.id) || 0;
+      const penalty = (r.team.noShowCount * 20) + (activeReports * 15);
+      const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
+      return {
+        ...r,
+        team: {
+          ...r.team,
+          trustFactor,
+          activeReportsCount: activeReports,
+        },
+      };
     });
   } else if (user) {
     // Check if user has teams that responded
@@ -139,25 +167,54 @@ export async function GET(
     ).map((tm) => tm.teamId);
 
     if (userTeamIds.length > 0) {
-      responses = await prisma.scrimResponse.findMany({
+      const rawUserResponses = await prisma.scrimResponse.findMany({
         where: {
           requestId: id,
           teamId: { in: userTeamIds },
         },
         include: {
           team: {
-            select: { id: true, name: true, tag: true, logoUrl: true },
+            select: {
+              id: true,
+              name: true,
+              tag: true,
+              logoUrl: true,
+              noShowCount: true,
+              avgElo: true,
+              stats: {
+                select: { winRate: true, matchesPlayed: true },
+              },
+            },
           },
           slot: true,
         },
       });
+
+      responses = rawUserResponses.map((r) => {
+        const penalty = r.team.noShowCount * 20;
+        const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
+        return {
+          ...r,
+          team: {
+            ...r.team,
+            trustFactor,
+          },
+        };
+      });
     }
   }
+
+  const teamPenalty = scrim.team.noShowCount * 20;
+  const teamTrustFactor = Math.max(0, Math.min(100, 100 - teamPenalty));
 
   const payload = {
     success: true,
     data: {
       ...scrim,
+      team: {
+        ...scrim.team,
+        trustFactor: teamTrustFactor,
+      },
       isAuthor: Boolean(isAuthorManager),
       targetTeam,
       isTargetManager,

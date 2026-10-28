@@ -15,7 +15,7 @@ import { VetoState } from '@/lib/veto/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, Ban, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { AlertCircle, Ban, ArrowLeft, ShieldAlert, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface MatchLobbyData {
@@ -259,17 +259,26 @@ export default function MatchLobbyPage() {
             onRefresh={fetchMatch}
           />
 
-          {/* Mutual Cancellation Action */}
-          <div className="pt-2 flex justify-end">
+          {/* Mutual Cancellation Action - Full Width Block */}
+          <div className="pt-1">
             <Button
               variant="outline"
-              size="sm"
               disabled={cancelling || match.status === 'CANCELLED'}
               onClick={handleCancelMatch}
-              className="text-xs text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40 gap-1.5"
+              className="w-full h-12 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider text-rose-400 bg-rose-500/5 hover:bg-rose-500/15 border border-rose-500/30 hover:border-rose-500/60 shadow-lg transition-all gap-2"
             >
-              <Ban className="w-3.5 h-3.5" />
-              <span>Запросить отмену матча</span>
+              {cancelling ? (
+                <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+              ) : (
+                <Ban className="w-4 h-4 text-rose-400" />
+              )}
+              <span>
+                {match.status === 'CANCELLED'
+                  ? 'Матч отменен'
+                  : cancelling
+                  ? 'Отмена матча...'
+                  : 'Запросить отмену матча'}
+              </span>
             </Button>
           </div>
         </div>

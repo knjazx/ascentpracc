@@ -103,6 +103,24 @@ interface TeamDetail {
       logoUrl: string | null;
     };
   }>;
+  reportsReceived?: Array<{
+    id: string;
+    topic: string;
+    text: string;
+    status: string;
+    createdAt: string;
+    reportingTeam?: {
+      id?: string;
+      name: string;
+      tag: string;
+      logoUrl?: string | null;
+    } | null;
+    reporterUser?: {
+      id: string;
+      nickname: string;
+      avatarUrl?: string | null;
+    } | null;
+  }>;
   stats: {
     winRate: number;
     matchesPlayed: number;
@@ -340,7 +358,7 @@ export default function TeamProfilePage() {
                   <span className="text-[11px] text-[#a1a1aa]">пунктуальность</span>
                 </div>
                 <div className="flex items-center gap-1 text-white font-mono">
-                  <Star className={`w-3.5 h-3.5 ${hasRatings ? 'text-emerald-400 fill-emerald-400' : 'text-[#71717a]'}`} />
+                  <Star className={`w-3.5 h-3.5 ${hasRatings ? 'text-amber-400 fill-amber-400' : 'text-[#71717a]'}`} />
                   <span className="font-bold">{sportsmanshipRating.toFixed(1)}</span>
                   <span className="text-[11px] text-[#a1a1aa]">адекватность</span>
                 </div>
@@ -750,7 +768,7 @@ export default function TeamProfilePage() {
             <Card className="border-[#222222] bg-[#111111] p-5 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase font-mono text-[#a1a1aa] font-semibold">Адекватность</span>
-                <Star className={`w-4 h-4 ${hasRatings ? 'text-emerald-400 fill-emerald-400' : 'text-[#71717a]'}`} />
+                <Star className={`w-4 h-4 ${hasRatings ? 'text-amber-400 fill-amber-400' : 'text-[#71717a]'}`} />
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-black font-mono text-white">
@@ -760,7 +778,7 @@ export default function TeamProfilePage() {
               </div>
               <div className="w-full bg-[#1c1c1c] h-1.5 rounded-full overflow-hidden">
                 <div
-                  className="bg-emerald-400 h-full rounded-full transition-all"
+                  className="bg-amber-400 h-full rounded-full transition-all"
                   style={{ width: `${hasRatings ? Math.min(100, Math.max(0, (sportsmanshipRating / 5) * 100)) : 0}%` }}
                 />
               </div>
@@ -821,107 +839,239 @@ export default function TeamProfilePage() {
             </Card>
           </div>
 
-          {/* Opponent Reviews Section */}
-          <Card className="border-[#222222] bg-[#111111] p-6 space-y-5 rounded-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#222222] pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-white" />
-                  <span>Отзывы соперников ({team.ratingsReceived?.length || 0})</span>
-                </h2>
-                <p className="text-xs text-[#a1a1aa] mt-0.5">
-                  Оценки, выставленные другими командами после окончания официальных матчей.
-                </p>
-              </div>
-            </div>
+          {/* Opponent Reviews and Complaints Section */}
+          {(() => {
+            type FeedbackItem =
+              | {
+                  type: 'REVIEW';
+                  id: string;
+                  createdAt: string;
+                  byTeam: {
+                    id: string;
+                    name: string;
+                    tag: string;
+                    logoUrl?: string | null;
+                  };
+                  punctuality: number;
+                  sportsmanship: number;
+                  comment: string | null;
+                }
+              | {
+                  type: 'REPORT';
+                  id: string;
+                  createdAt: string;
+                  topic: string;
+                  text: string;
+                  status: string;
+                  reportingTeam?: {
+                    id?: string;
+                    name: string;
+                    tag: string;
+                    logoUrl?: string | null;
+                  } | null;
+                  reporterUser?: {
+                    id: string;
+                    nickname: string;
+                    avatarUrl?: string | null;
+                  } | null;
+                };
 
-            {!team.ratingsReceived || team.ratingsReceived.length === 0 ? (
-              <div className="py-12 text-center rounded-xl border border-[#222222] bg-[#0a0a0a] space-y-3">
-                <Star className="w-10 h-10 text-[#52525b] mx-auto stroke-[1.5]" />
-                <p className="text-white font-bold text-sm">Оценок пока нет</p>
-                <p className="text-xs text-[#71717a] max-w-md mx-auto font-mono">
-                  После завершения официального матча капитаны обеих команд получают возможность оценить соперника по пунктуальности и адекватности.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {team.ratingsReceived.map((rating) => {
-                  const ratingDate = new Date(rating.createdAt).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  });
+            const reviews: FeedbackItem[] = (team.ratingsReceived || []).map((r) => ({
+              type: 'REVIEW' as const,
+              id: r.id,
+              createdAt: r.createdAt,
+              byTeam: r.byTeam,
+              punctuality: r.punctuality,
+              sportsmanship: r.sportsmanship,
+              comment: r.comment,
+            }));
 
-                  return (
-                    <div
-                      key={rating.id}
-                      className="p-4 rounded-xl border border-[#222222] bg-[#0a0a0a] space-y-3 hover:border-[#383838] transition-colors"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <Link href={`/teams/${rating.byTeam.id}`}>
-                            <div className="relative w-10 h-10 rounded-lg bg-[#141414] border border-[#2a2a2a] flex items-center justify-center overflow-hidden shrink-0 hover:border-white transition-colors">
-                              {rating.byTeam.logoUrl ? (
-                                <Image
-                                  src={rating.byTeam.logoUrl}
-                                  alt={rating.byTeam.name}
-                                  width={40}
-                                  height={40}
-                                  className="object-cover w-full h-full"
-                                  unoptimized
-                                />
-                              ) : (
-                                <span className="font-mono font-bold text-xs text-white">
-                                  {rating.byTeam.tag}
-                                </span>
-                              )}
+            const reports: FeedbackItem[] = (team.reportsReceived || []).map((rep) => ({
+              type: 'REPORT' as const,
+              id: rep.id,
+              createdAt: rep.createdAt,
+              topic: rep.topic,
+              text: rep.text,
+              status: rep.status,
+              reportingTeam: rep.reportingTeam,
+              reporterUser: rep.reporterUser,
+            }));
+
+            const allFeedback = [...reviews, ...reports].sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+
+            return (
+              <Card className="border-[#222222] bg-[#111111] p-6 space-y-5 rounded-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#222222] pb-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-white" />
+                      <span>Отзывы и жалобы ({allFeedback.length})</span>
+                    </h2>
+                    <p className="text-xs text-[#a1a1aa] mt-0.5">
+                      Оценки и официальные жалобы, выставленные другими командами после окончания матчей.
+                    </p>
+                  </div>
+                </div>
+
+                {allFeedback.length === 0 ? (
+                  <div className="py-12 text-center rounded-xl border border-[#222222] bg-[#0a0a0a] space-y-3">
+                    <Star className="w-10 h-10 text-[#52525b] mx-auto stroke-[1.5]" />
+                    <p className="text-white font-bold text-sm">Отзывов и жалоб пока нет</p>
+                    <p className="text-xs text-[#71717a] max-w-md mx-auto font-mono">
+                      После завершения официального матча капитаны обеих команд получают возможность оценить соперника по пунктуальности и адекватности или подать жалобу.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {allFeedback.map((item) => {
+                      const itemDate = new Date(item.createdAt).toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      });
+
+                      if (item.type === 'REPORT') {
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-4 rounded-xl border border-rose-500/30 bg-[#0e0707] space-y-3 hover:border-rose-500/50 transition-colors"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="relative w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center overflow-hidden shrink-0 text-rose-400">
+                                  {item.reportingTeam?.logoUrl ? (
+                                    <Image
+                                      src={item.reportingTeam.logoUrl}
+                                      alt={item.reportingTeam.name}
+                                      width={40}
+                                      height={40}
+                                      className="object-cover w-full h-full"
+                                      unoptimized
+                                    />
+                                  ) : (
+                                    <AlertTriangle className="w-5 h-5 text-rose-400" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-sm text-white">
+                                      {item.reportingTeam ? (
+                                        item.reportingTeam.id ? (
+                                          <Link href={`/teams/${item.reportingTeam.id}`} className="hover:underline">
+                                            [{item.reportingTeam.tag}] {item.reportingTeam.name}
+                                          </Link>
+                                        ) : (
+                                          `[${item.reportingTeam.tag}] ${item.reportingTeam.name}`
+                                        )
+                                      ) : (
+                                        item.reporterUser?.nickname || 'Участник матча'
+                                      )}
+                                    </span>
+                                    <Badge variant="destructive" className="text-[10px] py-0 bg-rose-500/20 text-rose-400 border border-rose-500/40 uppercase font-mono font-bold tracking-wider flex items-center gap-1">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      <span>Жалоба</span>
+                                    </Badge>
+                                  </div>
+                                  <span className="text-[11px] font-mono text-[#71717a]">
+                                    {itemDate}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Complaint Topic */}
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 font-mono text-xs">
+                                <span className="text-[#a1a1aa]">Тема:</span>
+                                <span className="font-bold text-rose-400">{item.topic}</span>
+                              </div>
                             </div>
-                          </Link>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <Link
-                                href={`/teams/${rating.byTeam.id}`}
-                                className="font-bold text-sm text-white hover:underline transition-colors"
-                              >
-                                {rating.byTeam.name}
+
+                            {/* Complaint Text */}
+                            {item.text && (
+                              <div className="p-3 rounded-lg bg-[#140a0a] border-l-2 border-rose-500/80 text-xs text-[#e4e4e7] font-sans">
+                                «{item.text}»
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-4 rounded-xl border border-[#222222] bg-[#0a0a0a] space-y-3 hover:border-[#383838] transition-colors"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <Link href={`/teams/${item.byTeam.id}`}>
+                                <div className="relative w-10 h-10 rounded-lg bg-[#141414] border border-[#2a2a2a] flex items-center justify-center overflow-hidden shrink-0 hover:border-white transition-colors">
+                                  {item.byTeam.logoUrl ? (
+                                    <Image
+                                      src={item.byTeam.logoUrl}
+                                      alt={item.byTeam.name}
+                                      width={40}
+                                      height={40}
+                                      className="object-cover w-full h-full"
+                                      unoptimized
+                                    />
+                                  ) : (
+                                    <span className="font-mono font-bold text-xs text-white">
+                                      {item.byTeam.tag}
+                                    </span>
+                                  )}
+                                </div>
                               </Link>
-                              <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#161616] px-1.5 py-0.5 rounded border border-[#262626]">
-                                [{rating.byTeam.tag}]
-                              </span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    href={`/teams/${item.byTeam.id}`}
+                                    className="font-bold text-sm text-white hover:underline transition-colors"
+                                  >
+                                    {item.byTeam.name}
+                                  </Link>
+                                  <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#161616] px-1.5 py-0.5 rounded border border-[#262626]">
+                                    [{item.byTeam.tag}]
+                                  </span>
+                                  <Badge variant="outline" className="text-[10px] py-0 border-emerald-500/30 text-emerald-400 bg-emerald-500/5">
+                                    Отзыв
+                                  </Badge>
+                                </div>
+                                <span className="text-[11px] font-mono text-[#71717a]">
+                                  {itemDate}
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-[11px] font-mono text-[#71717a]">
-                              {ratingDate}
-                            </span>
-                          </div>
-                        </div>
 
-                        {/* Scores */}
-                        <div className="flex items-center gap-3 flex-wrap font-mono text-xs">
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#161616] border border-[#282828]">
-                            <Clock className="w-3.5 h-3.5 text-amber-400" />
-                            <span className="text-[#a1a1aa]">Пунктуальность:</span>
-                            <span className="font-bold text-white">{rating.punctuality}/5</span>
+                            {/* Scores */}
+                            <div className="flex items-center gap-3 flex-wrap font-mono text-xs">
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#161616] border border-[#282828]">
+                                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                                <span className="text-[#a1a1aa]">Пунктуальность:</span>
+                                <span className="font-bold text-white">{item.punctuality}/5</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#161616] border border-[#282828]">
+                                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                                <span className="text-[#a1a1aa]">Адекватность:</span>
+                                <span className="font-bold text-white">{item.sportsmanship}/5</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#161616] border border-[#282828]">
-                            <Star className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
-                            <span className="text-[#a1a1aa]">Адекватность:</span>
-                            <span className="font-bold text-white">{rating.sportsmanship}/5</span>
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Comment */}
-                      {rating.comment && (
-                        <div className="p-3 rounded-lg bg-[#111111] border-l-2 border-white/60 text-xs text-[#d4d4d8] italic font-sans">
-                          «{rating.comment}»
+                          {/* Comment */}
+                          {item.comment && (
+                            <div className="p-3 rounded-lg bg-[#111111] border-l-2 border-white/60 text-xs text-[#d4d4d8] italic font-sans">
+                              «{item.comment}»
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
         </div>
       )}
 

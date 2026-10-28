@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { MatchStatus, ReportTargetType, ReportStatus } from '@prisma/client';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function POST(
   _request: NextRequest,
@@ -127,6 +128,9 @@ export async function POST(
         });
       }
     });
+
+    memoryCache.invalidate(`team:detail:${opponentTeam.id}`);
+    memoryCache.invalidate('teams:');
 
     return NextResponse.json({
       success: true,

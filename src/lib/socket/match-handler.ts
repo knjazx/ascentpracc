@@ -185,13 +185,11 @@ export function registerMatchHandlers(io: SocketIOServer, socket: AuthenticatedS
         }
 
         const authorTeamTag = isManagerA ? match.teamA.tag : isManagerB ? match.teamB.tag : 'Судья';
-        const connectUrl = `steam://connect/${serverInfo.ip}:${serverInfo.port}${
-          serverInfo.password ? '/' + serverInfo.password : ''
-        }`;
+        const displayAddr = (serverInfo as any).connectUrl || serverInfo.ip;
 
         const payload = {
           ...serverInfo,
-          connectUrl,
+          connectUrl: displayAddr,
           byTeamId: isManagerA ? match.teamAId : match.teamBId,
         };
 
@@ -205,7 +203,7 @@ export function registerMatchHandlers(io: SocketIOServer, socket: AuthenticatedS
             data: {
               matchId,
               system: true,
-              text: `Команда [${authorTeamTag}] обновила параметры сервера: ${serverInfo.ip}:${serverInfo.port}`,
+              text: `Команда [${authorTeamTag}] обновила ссылку на сервер: ${displayAddr}`,
             },
           });
         });
@@ -215,7 +213,7 @@ export function registerMatchHandlers(io: SocketIOServer, socket: AuthenticatedS
           id: `sys-${Date.now()}`,
           matchId,
           system: true,
-          text: `Команда [${authorTeamTag}] обновила параметры сервера: ${serverInfo.ip}:${serverInfo.port}`,
+          text: `Команда [${authorTeamTag}] обновила ссылку на сервер: ${displayAddr}`,
           createdAt: new Date().toISOString(),
         });
 

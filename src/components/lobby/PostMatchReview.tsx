@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar, Star, ShieldAlert, Swords, CheckCircle2, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Star, ShieldAlert, Swords, CheckCircle2, MessageSquare, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { ReportTeamModal } from '@/components/matches/ReportTeamModal';
 
@@ -28,8 +28,8 @@ export function PostMatchReview({
   teamB,
   onRefresh,
 }: PostMatchReviewProps) {
-  const [punctuality, setPunctuality] = useState<number>(5);
-  const [sportsmanship, setSportsmanship] = useState<number>(5);
+  const [punctuality, setPunctuality] = useState<number>(0);
+  const [sportsmanship, setSportsmanship] = useState<number>(0);
   const [comment, setComment] = useState<string>('');
   const [submittingRating, setSubmittingRating] = useState<boolean>(false);
   const [ratingSaved, setRatingSaved] = useState<boolean>(false);
@@ -51,8 +51,16 @@ export function PostMatchReview({
 
   const handleRatingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (punctuality === 0 || sportsmanship === 0) {
+      setMsg({ type: 'error', text: 'Пожалуйста, оцените пунктуальность и спортивное поведение звёздами' });
+      return;
+    }
     if (!comment.trim() || comment.trim().length < 5) {
-      setMsg({ type: 'error', text: 'Пожалуйста, обязательно опишите ситуацию в комментарии (минимум 5 символов)' });
+      setMsg({ type: 'error', text: 'Пожалуйста, опишите ситуацию в комментарии (минимум 5 символов)' });
+      return;
+    }
+    if (comment.trim().length > 200) {
+      setMsg({ type: 'error', text: 'Комментарий не может превышать 200 символов' });
       return;
     }
 
@@ -115,13 +123,26 @@ export function PostMatchReview({
     }
   };
 
+  if (!canReportNoShow && !(isConfirmed && isManager)) {
+    return null;
+  }
+
   return (
     <Card className="border border-border bg-card shadow-xl shadow-black/40">
       <CardHeader className="pb-3 border-b border-border">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-white" />
-            <span>Действия и календарь</span>
+            {isConfirmed ? (
+              <>
+                <Swords className="w-4 h-4 text-white" />
+                <span>Итоги матча и оценка</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="w-4 h-4 text-rose-400" />
+                <span>Фиксация неявки</span>
+              </>
+            )}
           </CardTitle>
           {isConfirmed && (
             <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
@@ -132,22 +153,6 @@ export function PostMatchReview({
       </CardHeader>
 
       <CardContent className="pt-4 space-y-4">
-        {/* Calendar .ics export */}
-        <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-cs-panel">
-          <div>
-            <p className="text-xs font-semibold text-foreground">Синхронизация с календарем</p>
-            <p className="text-[11px] text-muted-foreground">
-              Добавьте событие в Google Календарь, Apple или Outlook
-            </p>
-          </div>
-          <a href={`/api/matches/${matchId}/ics`} download>
-            <Button variant="outline" size="sm" className="text-xs gap-1.5 h-8">
-              <Calendar className="w-3.5 h-3.5 text-primary" />
-              <span>Скачать .ics</span>
-            </Button>
-          </a>
-        </div>
-
         {/* No-show emergency button */}
         {canReportNoShow && (
           <div className="p-3 rounded-lg border border-rose-500/40 bg-rose-500/10 flex items-center justify-between">
@@ -210,12 +215,12 @@ export function PostMatchReview({
                         type="button"
                         key={star}
                         onClick={() => setPunctuality(star)}
-                        className="p-1 text-muted-foreground hover:text-white transition-colors"
+                        className="p-1 text-muted-foreground hover:text-amber-400 transition-colors"
                       >
                         <Star
                           className={`w-4 h-4 ${
                             star <= punctuality
-                              ? 'text-white fill-white'
+                              ? 'text-amber-400 fill-amber-400'
                               : 'text-neutral-700'
                           }`}
                         />
@@ -233,12 +238,12 @@ export function PostMatchReview({
                         type="button"
                         key={star}
                         onClick={() => setSportsmanship(star)}
-                        className="p-1 text-muted-foreground hover:text-white transition-colors"
+                        className="p-1 text-muted-foreground hover:text-amber-400 transition-colors"
                       >
                         <Star
                           className={`w-4 h-4 ${
                             star <= sportsmanship
-                              ? 'text-white fill-white'
+                              ? 'text-amber-400 fill-amber-400'
                               : 'text-neutral-700'
                           }`}
                         />
@@ -252,13 +257,15 @@ export function PostMatchReview({
                     <span className="text-muted-foreground font-semibold">
                       Описание ситуации <span className="text-rose-400">*</span>:
                     </span>
-                    <span className="text-[10px] text-muted-foreground font-mono">обязательно</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {comment.length} / 200
+                    </span>
                   </div>
                   <textarea
-                    placeholder="Обязательно опишите, как прошел матч (пунктуальность соперника, поведение, инциденты)..."
+                    placeholder="Опишите, как прошел матч (пунктуальность соперника, поведение, инциденты)..."
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    maxLength={500}
+                    maxLength={200}
                     rows={3}
                     required
                     className="w-full rounded-md border border-input bg-cs-panel px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white resize-none"

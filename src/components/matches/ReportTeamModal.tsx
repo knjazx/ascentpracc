@@ -226,19 +226,19 @@ export function ReportTeamModal({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono font-semibold uppercase text-[#a1a1aa]">
-                  Подробности и таймкоды *
+                  Подробности *
                 </label>
                 <span className="text-[11px] font-mono text-[#52525b]">
-                  {description.length} / 1000
+                  {description.length} / 200
                 </span>
               </div>
               <textarea
                 rows={3}
                 required
-                maxLength={1000}
+                maxLength={200}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Опишите подозрительные раунды, ники игроков, таймкоды или суть нарушения..."
+                placeholder="Опишите суть нарушения..."
                 className="w-full rounded-xl border border-[#222222] bg-[#0c0c0c] px-3.5 py-2.5 text-xs text-white placeholder:text-[#52525b] focus-visible:outline-none focus-visible:border-white resize-none"
               />
             </div>

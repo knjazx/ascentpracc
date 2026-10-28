@@ -21,6 +21,8 @@ import {
   Swords,
   ArrowRight,
   ShieldAlert,
+  ShieldCheck,
+  Loader2,
   Send,
   MessageSquare,
   Trophy,
@@ -29,6 +31,7 @@ import {
   Quote,
   MapPin,
 } from 'lucide-react';
+import { FaceitBadge } from '@/components/ui/FaceitBadge';
 
 const ALL_POOL_MAPS = [
   { id: 'de_dust2', name: 'Dust2', image: '/maps/de_dust2.webp' },
@@ -70,6 +73,8 @@ interface ScrimDetail {
     tag: string;
     logoUrl: string | null;
     noShowCount: number;
+    avgElo?: number | null;
+    trustFactor?: number;
     stats: {
       winRate: number;
       matchesPlayed: number;
@@ -95,6 +100,9 @@ interface ScrimDetail {
       tag: string;
       logoUrl: string | null;
       noShowCount: number;
+      avgElo?: number | null;
+      trustFactor?: number;
+      activeReportsCount?: number;
       stats?: { winRate: number; matchesPlayed: number } | null;
     };
     slot?: { startsAt: string; durationMin: number } | null;
@@ -121,6 +129,7 @@ export default function ScrimDetailPage() {
   const [customTime, setCustomTime] = useState('20:00');
   const [responseMessage, setResponseMessage] = useState('');
   const [submittingResponse, setSubmittingResponse] = useState(false);
+  const [responseSent, setResponseSent] = useState(false);
 
   // Action states
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -189,6 +198,7 @@ export default function ScrimDetailPage() {
       }
 
       setResponseMessage('');
+      setResponseSent(true);
       await fetchScrim();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Не удалось отправить отклик');
@@ -250,6 +260,7 @@ export default function ScrimDetailPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Ошибка при отзыве отклика');
       }
+      setResponseSent(false);
       clearClientCache(`scrim:detail:${id}`);
       clearClientCache('feed:');
       await fetchScrim();
@@ -268,6 +279,7 @@ export default function ScrimDetailPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Ошибка при отмене заявки');
       }
+      setResponseSent(false);
       clearClientCache(`scrim:detail:${id}`);
       clearClientCache('feed:');
       setScrim((prev) => (prev ? { ...prev, status: 'CANCELLED' } : null));
@@ -295,6 +307,7 @@ export default function ScrimDetailPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Ошибка при принятии вызова');
       }
+      setResponseSent(false);
       clearClientCache(`scrim:detail:${id}`);
       clearClientCache('feed:');
       router.push(`/lobby/${data.data.matchId}`);
@@ -317,6 +330,7 @@ export default function ScrimDetailPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Ошибка при отклонении вызова');
       }
+      setResponseSent(false);
       clearClientCache(`scrim:detail:${id}`);
       clearClientCache('feed:');
       await fetchScrim();
@@ -360,6 +374,8 @@ export default function ScrimDetailPage() {
   };
 
   const isChallenge = Boolean(scrim.targetTeam);
+  const userResponses = scrim.responses || [];
+  const hasPendingResponse = responseSent || userResponses.length > 0;
 
   const statusBadges = {
     OPEN: (
@@ -485,7 +501,7 @@ export default function ScrimDetailPage() {
               </Link>
 
               <div className="space-y-1">
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
                   <Link
                     href={`/teams/${scrim.team.id}`}
                     className="font-black text-2xl text-foreground hover:text-white transition-colors tracking-tight"
@@ -495,6 +511,29 @@ export default function ScrimDetailPage() {
                   <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#161616] px-2 py-0.5 rounded border border-[#222222]">
                     [{scrim.team.tag}]
                   </span>
+
+                  {/* Faceit Level Icon & ELO Badge */}
+                  <FaceitBadge elo={scrim.team.avgElo} size="sm" />
+
+                  {/* Общая порядочность */}
+                  {(() => {
+                    const trust = typeof scrim.team.trustFactor === 'number' ? scrim.team.trustFactor : 100;
+                    const trustColor =
+                      trust >= 80
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : trust >= 60
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+                    return (
+                      <span
+                        className={`font-mono font-bold text-xs px-2.5 py-0.5 rounded-md border inline-flex items-center gap-1.5 select-none transition-colors shadow-sm ${trustColor}`}
+                        title={`Общая порядочность команды: ${trust}%`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                        <span>Порядочность: {trust}%</span>
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
                   <span className="text-[#10b981] font-semibold">
@@ -774,20 +813,27 @@ export default function ScrimDetailPage() {
       {/* Responses Management (Author View for standard open scrims) */}
       {scrim.isAuthor && !scrim.targetTeam && (
         <div className="space-y-4">
-          <h2 className="text-xl font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-white" />
-            <span>Отклики команд ({scrim.responses.length})</span>
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-2.5 font-mono">
+              <MessageSquare className="w-5 h-5 text-white" />
+              <span>Отклики команд ({scrim.responses.length})</span>
+            </h2>
+            {scrim.responses.length > 0 && (
+              <span className="text-xs text-[#71717a] font-mono hidden sm:inline">
+                Сравните порядочность и ELO перед подтверждением
+              </span>
+            )}
+          </div>
 
           {scrim.responses.length === 0 ? (
-            <div className="p-8 text-center rounded-xl border border-[#222222] bg-[#111111] shadow-xl text-[#a1a1aa] text-sm font-mono">
+            <div className="p-8 text-center rounded-2xl border border-[#222222] bg-[#111111] shadow-xl text-[#a1a1aa] text-sm font-mono">
               Пока нет откликов от соперников. Ссылка на заявку активна в ленте.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {scrim.responses.map((resp) => {
                 const isPending = resp.status === 'PENDING';
-                let slotInfo = 'Любое время';
+                let slotInfo = 'Любое предложенное время';
                 if (resp.slot) {
                   const { dateStr, timeStr } = formatSlotDateTime(resp.slot.startsAt, userTimezone);
                   slotInfo = `Слот: ${dateStr} в ${timeStr}`;
@@ -796,75 +842,110 @@ export default function ScrimDetailPage() {
                   slotInfo = `Свое время: ${dateStr} в ${timeStr}`;
                 }
 
+                const trust = typeof resp.team.trustFactor === 'number' ? resp.team.trustFactor : 100;
+                const trustColor =
+                  trust >= 80
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    : trust >= 60
+                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+
                 return (
                   <div
                     key={resp.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-[#222222] bg-[#111111] shadow-lg hover:border-white transition-all"
+                    className="relative p-5 rounded-2xl border border-[#262626] bg-gradient-to-r from-[#141414] via-[#111111] to-[#0e0e0e] shadow-xl hover:border-white/30 transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-5 group"
                   >
                     {/* Responding Team info */}
-                    <div className="flex items-center gap-3.5">
-                      <Link href={`/teams/${resp.team.id}`}>
-                        <div className="relative w-12 h-12 rounded-lg bg-[#0a0a0a] border border-[#222222] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+                    <div className="flex items-start sm:items-center gap-4 min-w-0">
+                      {/* Logo Box */}
+                      <Link href={`/teams/${resp.team.id}`} className="shrink-0 group/logo">
+                        <div className="relative w-14 h-14 rounded-xl bg-[#0a0a0a] border border-[#2a2a2a] flex items-center justify-center overflow-hidden shadow-md group-hover/logo:border-white/50 transition-all">
                           {resp.team.logoUrl ? (
                             <Image
                               src={resp.team.logoUrl}
                               alt={resp.team.name}
-                              width={48}
-                              height={48}
-                              className="object-cover w-full h-full"
+                              width={56}
+                              height={56}
+                              className="object-cover w-full h-full group-hover/logo:scale-105 transition-transform"
                               unoptimized
                             />
                           ) : (
-                            <span className="font-mono text-xs font-bold text-white">
+                            <span className="font-mono text-sm font-black text-white">
                               {resp.team.tag}
                             </span>
                           )}
                         </div>
                       </Link>
 
-                      <div>
-                        <div className="flex items-center gap-2">
+                      {/* Team details */}
+                      <div className="space-y-1.5 min-w-0">
+                        {/* Row 1: Name, Tag, Faceit Badge, Trust Factor */}
+                        <div className="flex flex-wrap items-center gap-2">
                           <Link
                             href={`/teams/${resp.team.id}`}
-                            className="font-bold text-base text-foreground hover:text-white transition-colors"
+                            className="font-black text-base sm:text-lg text-white hover:text-[#e5e5e5] transition-colors truncate tracking-wide"
                           >
                             {resp.team.name}
                           </Link>
-                          <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#161616] px-1.5 py-0.5 rounded border border-[#222222]">
+                          <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#1a1a1a] px-2 py-0.5 rounded-md border border-[#2a2a2a]">
                             [{resp.team.tag}]
                           </span>
+
+                          {/* Faceit Level Icon & AVG ELO Badge */}
+                          <FaceitBadge elo={resp.team.avgElo} size="sm" />
+
+                          {/* Общая порядочность (Trust Factor) */}
+                          <span
+                            className={`font-mono font-bold text-xs px-2.5 py-0.5 rounded-md border inline-flex items-center gap-1.5 select-none transition-colors shadow-sm ${trustColor}`}
+                            title={`Общая порядочность команды: ${trust}%`}
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                            <span>Порядочность: {trust}%</span>
+                          </span>
                         </div>
-                        <p className="text-xs font-mono text-white mt-0.5">{slotInfo}</p>
+
+                        {/* Row 2: Selected Slot Time */}
+                        <div className="flex items-center gap-2 text-xs font-mono text-[#d4d4d8]">
+                          <Clock className="w-3.5 h-3.5 text-white/60 shrink-0" />
+                          <span className="font-semibold text-white/90">{slotInfo}</span>
+                        </div>
+
+                        {/* Row 3: Message / Note */}
                         {resp.message && (
-                          <p className="text-xs text-[#a1a1aa] italic mt-0.5 bg-[#0a0a0a] px-2 py-0.5 rounded border-l-2 border-white/60">
-                            «{resp.message}»
-                          </p>
+                          <div className="flex items-center gap-2 text-xs text-[#a1a1aa] bg-[#0a0a0a] px-3 py-1 rounded-lg border border-[#222222] max-w-xl">
+                            <Quote className="w-3 h-3 text-[#71717a] shrink-0" />
+                            <span className="italic text-[#d4d4d8]">«{resp.message}»</span>
+                          </div>
                         )}
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center pt-2 md:pt-0">
                       {isPending && scrim.status === 'OPEN' ? (
                         <>
                           <Button
                             variant="cs"
-                            size="sm"
+                            size="default"
                             disabled={actionLoading === resp.id}
                             onClick={() => handleAcceptResponse(resp.id)}
-                            className="text-xs font-bold gap-1.5"
+                            className="h-10 px-5 text-xs font-black uppercase tracking-wider gap-2 bg-white text-black hover:bg-[#e5e5e5] shadow-md border border-white"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {actionLoading === resp.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4" />
+                            )}
                             <span>Принять</span>
                           </Button>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="default"
                             disabled={actionLoading === resp.id}
                             onClick={() => handleDeclineResponse(resp.id)}
-                            className="text-xs text-[#ef4444] border-[#ef4444]/30 hover:bg-[#ef4444]/10 hover:border-[#ef4444]/60"
+                            className="h-10 px-4 text-xs font-bold gap-2 text-rose-400 border-rose-500/30 bg-rose-500/5 hover:bg-rose-500/15 hover:border-rose-500/60 transition-colors"
                           >
-                            <XCircle className="w-3.5 h-3.5" />
+                            <XCircle className="w-4 h-4" />
                             <span>Отклонить</span>
                           </Button>
                         </>
@@ -877,8 +958,13 @@ export default function ScrimDetailPage() {
                               ? 'destructive'
                               : 'secondary'
                           }
+                          className="font-mono text-xs uppercase px-3 py-1"
                         >
-                          {resp.status}
+                          {resp.status === 'ACCEPTED'
+                            ? '✓ ПРИНЯТ'
+                            : resp.status === 'DECLINED'
+                            ? 'ОТКЛОНЕН'
+                            : resp.status}
                         </Badge>
                       )}
                     </div>
@@ -985,180 +1071,225 @@ export default function ScrimDetailPage() {
         </Card>
       )}
 
-      {/* Opponent View: Respond to Scrim Form (only for standard open scrims) */}
+      {/* Opponent View: Respond to Scrim Form OR Response Sent State */}
       {!scrim.isAuthor && !scrim.targetTeam && scrim.status === 'OPEN' && (
-        <Card className="border border-[#222222] bg-[#111111] shadow-xl rounded-xl">
-          <CardHeader className="pb-3 border-b border-[#222222]">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Send className="w-4 h-4 text-white" />
-              <span>Откликнуться на прак</span>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Выберите свою команду и время, чтобы предложить матч организатору.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-5">
-            {!user ? (
-              <div className="py-4 text-center space-y-3">
-                <p className="text-xs text-muted-foreground">Войдите через Steam, чтобы отправить отклик.</p>
-                <Link href="/api/auth/steam">
-                  <Button variant="steam" size="sm">Войти через Steam</Button>
-                </Link>
-              </div>
-            ) : user.teams.length === 0 ? (
-              <div className="py-4 text-center space-y-3">
-                <p className="text-xs text-muted-foreground">У вас нет зарегистрированных команд для отклика.</p>
-                <Link href="/teams/new">
-                  <Button variant="cs" size="sm">Создать команду</Button>
-                </Link>
-              </div>
-            ) : (
-              <form onSubmit={handleSendResponse} className="space-y-4">
-                {/* Team selector */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-                    От имени какой команды:
-                  </label>
-                  <select
-                    value={selectedTeamId}
-                    onChange={(e) => setSelectedTeamId(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer font-bold"
-                  >
-                    {user.teams.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-neutral-900">
-                        {t.name} [{t.tag}]
-                      </option>
-                    ))}
-                  </select>
+        hasPendingResponse ? (
+          <Card className="border border-emerald-500/30 bg-[#111111] shadow-xl rounded-xl overflow-hidden">
+            <CardHeader className="pb-3 border-b border-[#222222] bg-emerald-500/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <CardTitle className="text-base font-bold text-foreground">
+                    Отклик отправлен
+                  </CardTitle>
                 </div>
+                <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 bg-emerald-500/10 text-xs">
+                  Ожидает рассмотрения
+                </Badge>
+              </div>
+              <CardDescription className="text-xs text-muted-foreground">
+                Ваш отклик передан организатору прака. Вы получите уведомление при подтверждении.
+              </CardDescription>
+            </CardHeader>
 
-                {/* Slot choice */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="font-semibold uppercase tracking-wider text-muted-foreground">
-                      Выбор времени встречи:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setProposeCustomTime(!proposeCustomTime)}
-                      className="text-white hover:underline font-bold"
+            <CardContent className="pt-4 pb-4 space-y-3">
+              {userResponses.length > 0 ? (
+                userResponses.map((resp) => {
+                  let slotTimeDisplay = 'Время из заявки';
+                  if (resp.slot?.startsAt) {
+                    const { dateStr, timeStr } = formatSlotDateTime(resp.slot.startsAt, userTimezone);
+                    slotTimeDisplay = `${dateStr} в ${timeStr}`;
+                  } else if (resp.proposedAt) {
+                    const { dateStr, timeStr } = formatSlotDateTime(resp.proposedAt, userTimezone);
+                    slotTimeDisplay = `Предложено: ${dateStr} в ${timeStr}`;
+                  }
+
+                  return (
+                    <div
+                      key={resp.id}
+                      className="p-3.5 rounded-xl border border-border/60 bg-muted/20 space-y-3"
                     >
-                      {proposeCustomTime ? 'Выбрать время организатора' : 'Предложить другое время'}
-                    </button>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-foreground">
+                              {resp.team.name}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-muted-foreground">
+                              [{resp.team.tag}]
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{slotTimeDisplay}</span>
+                          </p>
+                        </div>
+
+                        {resp.status === 'PENDING' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={actionLoading === resp.id}
+                            onClick={() => handleWithdrawResponse(resp.id)}
+                            className="text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 h-8 self-start sm:self-auto"
+                          >
+                            {actionLoading === resp.id ? 'Отзыв...' : 'Отозвать отклик'}
+                          </Button>
+                        )}
+                      </div>
+
+                      {resp.message && (
+                        <div className="p-2.5 rounded-lg bg-black/40 border-l-2 border-primary/60 text-xs text-muted-foreground italic">
+                          «{resp.message}»
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300">
+                  Отклик успешно отправлен и ожидает ответа организатора.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border border-[#222222] bg-[#111111] shadow-xl rounded-xl">
+            <CardHeader className="pb-3 border-b border-[#222222]">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Send className="w-4 h-4 text-white" />
+                <span>Откликнуться на прак</span>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Выберите свою команду и время, чтобы предложить матч организатору.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-5">
+              {!user ? (
+                <div className="py-4 text-center space-y-3">
+                  <p className="text-xs text-muted-foreground">Войдите через Steam, чтобы отправить отклик.</p>
+                  <Link href="/api/auth/steam">
+                    <Button variant="steam" size="sm">Войти через Steam</Button>
+                  </Link>
+                </div>
+              ) : user.teams.length === 0 ? (
+                <div className="py-4 text-center space-y-3">
+                  <p className="text-xs text-muted-foreground">У вас нет зарегистрированных команд для отклика.</p>
+                  <Link href="/teams/new">
+                    <Button variant="cs" size="sm">Создать команду</Button>
+                  </Link>
+                </div>
+              ) : (
+                <form onSubmit={handleSendResponse} className="space-y-4">
+                  {/* Team selector */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
+                      От имени какой команды:
+                    </label>
+                    <select
+                      value={selectedTeamId}
+                      onChange={(e) => setSelectedTeamId(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white cursor-pointer font-bold"
+                    >
+                      {user.teams.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-neutral-900">
+                          {t.name} [{t.tag}]
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  {!proposeCustomTime ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {scrim.slots.map((s) => {
-                        const { dateStr, timeStr } = formatSlotDateTime(s.startsAt, userTimezone);
-                        return (
-                          <label
-                            key={s.id}
-                            className={`flex items-center gap-2.5 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                              selectedSlotId === s.id
-                                ? 'border-white bg-white/10 text-foreground ring-1 ring-white/20'
-                                : 'border-neutral-800 bg-neutral-900/60 text-muted-foreground hover:text-foreground hover:border-neutral-700'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="scrim_slot"
-                              checked={selectedSlotId === s.id}
-                              onChange={() => setSelectedSlotId(s.id)}
-                              className="accent-white"
-                            />
-                            <span className="text-xs font-mono font-semibold">
-                              {dateStr} в {timeStr}
-                            </span>
-                          </label>
-                        );
-                      })}
+                  {/* Slot choice */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="font-semibold uppercase tracking-wider text-muted-foreground">
+                        Выбор времени встречи:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setProposeCustomTime(!proposeCustomTime)}
+                        className="text-white hover:underline font-bold"
+                      >
+                        {proposeCustomTime ? 'Выбрать время организатора' : 'Предложить другое время'}
+                      </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2 p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60">
-                      <input
-                        type="date"
-                        value={customDate}
-                        onChange={(e) => setCustomDate(e.target.value)}
-                        className="h-9 px-3 rounded-md bg-neutral-900 border border-neutral-700 text-xs text-foreground"
-                        required
-                      />
-                      <input
-                        type="time"
-                        value={customTime}
-                        onChange={(e) => setCustomTime(e.target.value)}
-                        className="h-9 px-3 rounded-md bg-neutral-900 border border-neutral-700 text-xs text-foreground font-mono font-bold"
-                        required
-                      />
-                    </div>
-                  )}
-                </div>
 
-                {/* Optional Message */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Сообщение организатору (необязательно)
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="например: наш сервер в Варшаве / готовы сыграть в 21:30"
-                    value={responseMessage}
-                    onChange={(e) => setResponseMessage(e.target.value)}
-                    maxLength={500}
-                    className="bg-cs-panel border-border"
-                  />
-                </div>
+                    {!proposeCustomTime ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {scrim.slots.map((s) => {
+                          const { dateStr, timeStr } = formatSlotDateTime(s.startsAt, userTimezone);
+                          return (
+                            <label
+                              key={s.id}
+                              className={`flex items-center gap-2.5 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                                selectedSlotId === s.id
+                                  ? 'border-white bg-white/10 text-foreground ring-1 ring-white/20'
+                                  : 'border-neutral-800 bg-neutral-900/60 text-muted-foreground hover:text-foreground hover:border-neutral-700'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="scrim_slot"
+                                checked={selectedSlotId === s.id}
+                                onChange={() => setSelectedSlotId(s.id)}
+                                className="accent-white"
+                              />
+                              <span className="text-xs font-mono font-semibold">
+                                {dateStr} в {timeStr}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <input
+                          type="date"
+                          value={customDate}
+                          onChange={(e) => setCustomDate(e.target.value)}
+                          className="h-9 px-3 rounded-md bg-neutral-900 border border-neutral-700 text-xs text-foreground"
+                          required
+                        />
+                        <input
+                          type="time"
+                          value={customTime}
+                          onChange={(e) => setCustomTime(e.target.value)}
+                          className="h-9 px-3 rounded-md bg-neutral-900 border border-neutral-700 text-xs text-foreground font-mono font-bold"
+                          required
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                <Button
-                  type="submit"
-                  variant="cs"
-                  disabled={submittingResponse}
-                  className="w-full gap-2 font-bold tracking-wider"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>{submittingResponse ? 'Отправка...' : 'Отправить отклик'}</span>
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                  {/* Optional Message */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Сообщение организатору (необязательно)
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="например: наш сервер в Варшаве / готовы сыграть в 21:30"
+                      value={responseMessage}
+                      onChange={(e) => setResponseMessage(e.target.value)}
+                      maxLength={500}
+                      className="bg-cs-panel border-border"
+                    />
+                  </div>
 
-      {/* Opponent's Existing Response Status */}
-      {!scrim.isAuthor && !scrim.targetTeam && scrim.responses.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-bold text-foreground">Ваш статус отклика на эту заявку:</h3>
-          {scrim.responses.map((resp) => (
-            <div
-              key={resp.id}
-              className="flex items-center justify-between p-4 rounded-xl border border-border bg-card shadow-xl shadow-black/40"
-            >
-              <div>
-                <p className="text-sm font-bold text-foreground">{resp.team.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Статус:{' '}
-                  <span className="font-semibold text-white">
-                    {resp.status === 'PENDING'
-                      ? 'Ожидает рассмотрения организатором'
-                      : resp.status}
-                  </span>
-                </p>
-              </div>
-
-              {resp.status === 'PENDING' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleWithdrawResponse(resp.id)}
-                  disabled={actionLoading === resp.id}
-                  className="text-xs text-rose-400 hover:bg-rose-500/10"
-                >
-                  Отозвать отклик
-                </Button>
+                  <Button
+                    type="submit"
+                    variant="cs"
+                    disabled={submittingResponse}
+                    className="w-full gap-2 font-bold tracking-wider"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>{submittingResponse ? 'Отправка...' : 'Отправить отклик'}</span>
+                  </Button>
+                </form>
               )}
-            </div>
-          ))}
-        </div>
+            </CardContent>
+          </Card>
+        )
       )}
     </div>
   );

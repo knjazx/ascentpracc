@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { isValidCS2Score } from '@/lib/validations/score';
-import { Trophy, AlertTriangle, CheckCircle, Upload, HelpCircle } from 'lucide-react';
+import { Trophy, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface MapInfo {
   id: string;
@@ -58,17 +58,97 @@ export function ScoreSubmissionCard({
   const [comment, setComment] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [justSubmitted, setJustSubmitted] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Sync state if maps change from props
+  useEffect(() => {
+    setScores((prev) => {
+      const next = { ...prev };
+      maps.forEach((m) => {
+        const prevA = userTeamRole === 'TEAM_A' ? m.scoreA_byA : m.scoreA_byB;
+        const prevB = userTeamRole === 'TEAM_A' ? m.scoreB_byA : m.scoreB_byB;
+        if (!next[m.id] || (!next[m.id].scoreA && !next[m.id].scoreB)) {
+          next[m.id] = {
+            scoreA: prevA !== null && prevA !== undefined ? String(prevA) : '',
+            scoreB: prevB !== null && prevB !== undefined ? String(prevB) : '',
+          };
+        }
+      });
+      return next;
+    });
+  }, [maps, userTeamRole]);
 
   if (!maps || maps.length === 0) {
     return null;
   }
 
-  // Only allow score submission during LIVE, AWAITING_RESULT, or DISPUTED
-  if (!['LIVE', 'AWAITING_RESULT', 'DISPUTED'].includes(status)) {
+  // Only allow score submission during LIVE, AWAITING_RESULT, DISPUTED, or CONFIRMED
+  if (!['LIVE', 'AWAITING_RESULT', 'DISPUTED', 'CONFIRMED'].includes(status)) {
     return null;
   }
+
+  const teamASubmitted =
+    maps.length > 0 &&
+    maps.every(
+      (m) =>
+        m.scoreA_byA !== null &&
+        m.scoreA_byA !== undefined &&
+        m.scoreB_byA !== null &&
+        m.scoreB_byA !== undefined
+    );
+
+  const teamBSubmitted =
+    maps.length > 0 &&
+    maps.every(
+      (m) =>
+        m.scoreA_byB !== null &&
+        m.scoreA_byB !== undefined &&
+        m.scoreB_byB !== null &&
+        m.scoreB_byB !== undefined
+    );
+
+  const isConfirmed = status === 'CONFIRMED';
+  const isDisputed = status === 'DISPUTED';
+
+  const userHasSubmitted =
+    justSubmitted ||
+    isConfirmed ||
+    (userTeamRole === 'TEAM_A' && teamASubmitted) ||
+    (userTeamRole === 'TEAM_B' && teamBSubmitted) ||
+    (userTeamRole === 'ADMIN' && (teamASubmitted || teamBSubmitted));
+
+  const opponentTag = userTeamRole === 'TEAM_A' ? teamB.tag : teamA.tag;
+  const opponentHasSubmitted =
+    (userTeamRole === 'TEAM_A' && teamBSubmitted) ||
+    (userTeamRole === 'TEAM_B' && teamASubmitted);
+
+  const getDisplayScore = (m: MapInfo) => {
+    if (m.finalScoreA !== null && m.finalScoreA !== undefined && m.finalScoreB !== null && m.finalScoreB !== undefined) {
+      return { scoreA: m.finalScoreA, scoreB: m.finalScoreB };
+    }
+    if (userTeamRole === 'TEAM_A' && m.scoreA_byA !== null && m.scoreA_byA !== undefined) {
+      return { scoreA: m.scoreA_byA, scoreB: m.scoreB_byA };
+    }
+    if (userTeamRole === 'TEAM_B' && m.scoreA_byB !== null && m.scoreA_byB !== undefined) {
+      return { scoreA: m.scoreA_byB, scoreB: m.scoreB_byB };
+    }
+    if (scores[m.id]?.scoreA && scores[m.id]?.scoreB) {
+      const sa = parseInt(scores[m.id].scoreA, 10);
+      const sb = parseInt(scores[m.id].scoreB, 10);
+      if (!isNaN(sa) && !isNaN(sb)) {
+        return { scoreA: sa, scoreB: sb };
+      }
+    }
+    if (m.scoreA_byA !== null && m.scoreA_byA !== undefined) {
+      return { scoreA: m.scoreA_byA, scoreB: m.scoreB_byA };
+    }
+    if (m.scoreA_byB !== null && m.scoreA_byB !== undefined) {
+      return { scoreA: m.scoreA_byB, scoreB: m.scoreB_byB };
+    }
+    return { scoreA: '-', scoreB: '-' };
+  };
 
   const handleScoreChange = (mapId: string, side: 'scoreA' | 'scoreB', val: string) => {
     setScores((prev) => ({
@@ -157,6 +237,7 @@ export function ScoreSubmissionCard({
         throw new Error(data.error || 'Ошибка при отправке счёта');
       }
 
+      setJustSubmitted(true);
       setSuccessMsg(data.message || 'Счёт успешно отправлен!');
       onScoreSubmitted();
     } catch (err: unknown) {
@@ -166,8 +247,125 @@ export function ScoreSubmissionCard({
     }
   };
 
-  const isDisputed = status === 'DISPUTED';
+  // 1. IF DISPUTED: show dispute resolution view
+  if (isDisputed) {
+    return (
+      <Card className="border border-rose-500/30 bg-card shadow-xl shadow-black/40">
+        <CardHeader className="pb-3 border-b border-rose-500/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+              <CardTitle className="text-base font-bold text-foreground">
+                Диспут по счёту матча
+              </CardTitle>
+            </div>
+            <Badge variant="destructive" className="flex items-center gap-1">
+              <span>Спорный результат</span>
+            </Badge>
+          </div>
+          <CardDescription className="text-xs text-rose-300/80">
+            Введенные счета команд не совпали. Матч передан судьям на ручную проверку.
+          </CardDescription>
+        </CardHeader>
 
+        <CardContent className="pt-4 space-y-3">
+          <div className="space-y-2">
+            {maps.map((m, idx) => (
+              <div
+                key={m.id}
+                className="p-3 rounded-lg border border-border/60 bg-muted/20 space-y-1"
+              >
+                <div className="text-xs font-bold uppercase tracking-wider text-primary">
+                  Карта {idx + 1}: {m.map}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono text-muted-foreground pt-1">
+                  <div>[{teamA.tag}] ввёл: <span className="font-bold text-foreground">{m.scoreA_byA ?? '-'} : {m.scoreB_byA ?? '-'}</span></div>
+                  <div>[{teamB.tag}] ввёл: <span className="font-bold text-foreground">{m.scoreA_byB ?? '-'} : {m.scoreB_byB ?? '-'}</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 2. IF USER HAS ALREADY SUBMITTED (OR CONFIRMED): show clean "Отправлено и всё" view
+  if (userHasSubmitted) {
+    return (
+      <Card className="border border-border bg-card shadow-xl shadow-black/40">
+        <CardHeader className="pb-3 border-b border-border">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-white" />
+              <CardTitle className="text-base font-bold text-foreground">
+                Результаты матча
+              </CardTitle>
+            </div>
+            <Badge
+              variant="outline"
+              className={
+                isConfirmed
+                  ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                  : 'border-white/20 text-white bg-white/5'
+              }
+            >
+              {isConfirmed ? 'Подтверждено' : 'Отправлено'}
+            </Badge>
+          </div>
+          <CardDescription className="text-xs text-muted-foreground">
+            {isConfirmed
+              ? 'Результаты подтверждены обеими командами.'
+              : 'Счёт зафиксирован и ожидает подтверждения второй команды.'}
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="pt-4 pb-4 space-y-3">
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+            <CheckCircle className="w-5 h-5 shrink-0 text-emerald-400" />
+            <div className="space-y-0.5">
+              <p className="text-xs font-bold text-foreground">
+                Счёт и результат отправлены
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {isConfirmed
+                  ? 'Счета обеих команд совпали, матч успешно завершен.'
+                  : 'Ожидается подтверждение второй команды.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {maps.map((m, idx) => {
+              const display = getDisplayScore(m);
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-muted/20"
+                >
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                    Карта {idx + 1}: {m.map}
+                  </span>
+
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold">
+                    <span className="text-foreground">
+                      [{teamA.tag}] {display.scoreA}
+                    </span>
+                    <span className="text-muted-foreground">:</span>
+                    <span className="text-foreground">
+                      {display.scoreB} [{teamB.tag}]
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 3. IF USER HAS NOT SUBMITTED YET: show score input form
   return (
     <Card className="border border-border bg-card shadow-xl shadow-black/40">
       <CardHeader className="pb-3 border-b border-border">
@@ -178,20 +376,13 @@ export function ScoreSubmissionCard({
               Ввод результатов матча
             </CardTitle>
           </div>
-          {isDisputed ? (
-            <Badge variant="destructive" className="flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Диспут по счёту</span>
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-xs border-neutral-700">
-              CS2 MR12 / MR3
-            </Badge>
-          )}
+          <Badge variant="outline" className="text-xs border-neutral-700">
+            CS2 MR12 / MR3
+          </Badge>
         </div>
         <CardDescription className="text-xs text-muted-foreground">
-          {isDisputed
-            ? 'Счета обеих команд не совпали. Приложите скриншот табло счёта для решения судьями.'
+          {opponentHasSubmitted
+            ? `Команда [${opponentTag}] уже отправила свой результат. Введите ваш финальный счёт карт для подтверждения.`
             : 'Каждая команда вводит финальный счёт сыгранных карт. При совпадении результат подтверждается автоматически.'}
         </CardDescription>
       </CardHeader>

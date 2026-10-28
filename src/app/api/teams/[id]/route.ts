@@ -103,6 +103,74 @@ export async function GET(
   const penalty = (team.noShowCount * 20) + (activeReportsCount * 15);
   const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
 
+  // Fetch all reports submitted against this team
+  const rawReports = await prisma.report.findMany({
+    where: {
+      targetType: 'TEAM',
+      targetId: id,
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      reporter: {
+        select: {
+          id: true,
+          nickname: true,
+          avatarUrl: true,
+          teams: {
+            select: {
+              team: {
+                select: { id: true, name: true, tag: true, logoUrl: true },
+              },
+            },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  const reportsReceived = rawReports.map((rep) => {
+    let topic = 'Жалоба';
+    let text = rep.reason;
+
+    const catMatch = rep.reason.match(/\[Категория:\s*([^\]]+)\]/);
+    if (catMatch) {
+      topic = catMatch[1].trim();
+    } else if (rep.reason.toLowerCase().includes('неявка')) {
+      topic = 'Неявка / Срыв матча';
+    }
+
+    const applicantMatch = rep.reason.match(/\[Заявитель:\s*\[([^\]]+)\]\s*([^\]\n]+)\]/);
+    if (rep.reason.includes('\n')) {
+      text = rep.reason.split('\n').slice(1).join('\n').trim();
+    }
+
+    if (text.length > 200) {
+      text = text.slice(0, 200);
+    }
+
+    const reportingTeam = rep.reporter?.teams?.[0]?.team || (applicantMatch ? { tag: applicantMatch[1], name: applicantMatch[2] } : null);
+
+    return {
+      id: rep.id,
+      topic,
+      text,
+      status: rep.status,
+      createdAt: rep.createdAt.toISOString(),
+      reportingTeam,
+      reporterUser: rep.reporter ? {
+        id: rep.reporter.id,
+        nickname: rep.reporter.nickname,
+        avatarUrl: rep.reporter.avatarUrl,
+      } : null,
+    };
+  });
+
+  const ratingsReceived = (team.ratingsReceived || []).map((r) => ({
+    ...r,
+    comment: r.comment ? (r.comment.length > 200 ? r.comment.slice(0, 200) : r.comment) : null,
+  }));
+
   // Combine and sort recent matches
   const recentMatches = [
     ...team.matchesAsTeamA.map((m) => ({
@@ -133,6 +201,8 @@ export async function GET(
       success: true,
       data: {
         ...team,
+        ratingsReceived,
+        reportsReceived,
         avgPunctuality,
         avgSportsmanship,
         ratingCount: ratings.length,
