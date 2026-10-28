@@ -33,7 +33,14 @@ export async function GET(request: NextRequest) {
   const where: Prisma.ScrimRequestWhereInput = {
     status: ScrimStatus.OPEN,
     expiresAt: { gt: now },
-    NOT: { level: { startsWith: 'CHALLENGE:' } },
+    AND: [
+      {
+        OR: [
+          { level: null },
+          { level: { not: { startsWith: 'CHALLENGE:' } } },
+        ],
+      },
+    ],
   };
 
   if (teamId) {
@@ -183,6 +190,14 @@ export async function POST(request: NextRequest) {
         teamId: validated.teamId,
         status: ScrimStatus.OPEN,
         expiresAt: { gt: new Date() },
+        AND: [
+          {
+            OR: [
+              { level: null },
+              { level: { not: { startsWith: 'CHALLENGE:' } } },
+            ],
+          },
+        ],
       },
       select: { id: true },
     });
