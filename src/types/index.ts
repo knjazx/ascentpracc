@@ -27,7 +27,7 @@ export type {
 export type PlatformType = 'CYBERSHOCK' | 'XPLAY' | 'FASTCUP' | 'OTHER';
 
 export const PLATFORM_LABELS: Record<string, string> = {
-  CYBERSHOCK: 'Cybershock',
+  CYBERSHOCK: 'Cybershoke',
   XPLAY: 'Xplay',
   FASTCUP: 'Fastcup',
   OTHER: 'Другой',

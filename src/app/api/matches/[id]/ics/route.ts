@@ -25,8 +25,8 @@ export async function GET(
     }
 
     const startDate = new Date(match.scheduledAt);
-    // Estimated match duration: BO1 = 1.5h, BO2 = 2.5h, BO3 = 3.5h
-    const durationHours = match.format === 'BO1' ? 1.5 : match.format === 'BO2' ? 2.5 : 3.5;
+    // Estimated match duration: BO1 = 1.5h, BO3 = 3.5h, BO5 = 5.0h
+    const durationHours = match.format === 'BO1' ? 1.5 : match.format === 'BO3' ? 3.5 : match.format === 'BO5' ? 5.0 : 2.5;
     const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
 
     const now = new Date();

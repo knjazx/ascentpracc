@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     where.teamId = teamId;
   }
 
-  if (format && ['BO1', 'BO2', 'BO3'].includes(format)) {
+  if (format && ['BO1', 'BO2', 'BO3', 'BO5'].includes(format)) {
     where.format = format as Prisma.EnumScrimFormatFilter['equals'];
   }
 
@@ -259,6 +259,7 @@ export async function POST(request: NextRequest) {
           serverLocations: validated.serverLocations,
           platform: validated.platform,
           excludedMaps: validated.excludedMaps,
+          presetMaps: validated.presetMaps || [],
           comment: validated.comment || null,
           expiresAt,
           slots: {

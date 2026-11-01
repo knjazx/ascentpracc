@@ -91,7 +91,7 @@ function LoginContent() {
               </div>
               <div className="flex items-center gap-2.5">
                 <Swords className="w-4 h-4 text-white shrink-0" />
-                <span>Интерактивное вето карт (BO1, BO2, BO3) в реальном времени</span>
+                <span>Интерактивное вето карт (BO1, BO3, BO5) в реальном времени</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-white shrink-0" />

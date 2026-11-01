@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       format = 'BO1',
       platform = 'CYBERSHOCK',
       serverLocations = [],
+      presetMaps = [],
       slots = [],
       comment = '',
     } = body;
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
           platform: String(platform || 'CYBERSHOCK'),
           serverBy: serverLocations.length > 0 ? ServerBy.HOST : ServerBy.NEGOTIABLE,
           serverLocations: Array.isArray(serverLocations) ? serverLocations : [],
+          presetMaps: Array.isArray(presetMaps) ? presetMaps : [],
           level: `CHALLENGE:${targetTeamId}`,
           comment: comment ? String(comment).trim().slice(0, 500) : null,
           status: ScrimStatus.OPEN,

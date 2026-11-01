@@ -13,7 +13,7 @@ import { getClientCache, setClientCache } from '@/lib/client-cache';
 
 interface MatchDetails {
   id: string;
-  format: 'BO1' | 'BO2' | 'BO3';
+  format: 'BO1' | 'BO2' | 'BO3' | 'BO5';
   platform?: string;
   status: string;
   scheduledAt: string;
@@ -178,14 +178,14 @@ export default function MatchDetailPage() {
               </Badge>
               <Badge variant="outline" className="font-mono text-xs border-white/20 text-white bg-white/5">
                 {match.platform === 'CYBERSHOCK'
-                  ? 'Cybershock'
+                  ? 'Cybershoke'
                   : match.platform === 'XPLAY'
                   ? 'Xplay'
                   : match.platform === 'FASTCUP'
                   ? 'Fastcup'
                   : match.platform === 'OTHER'
                   ? 'Другой'
-                  : match.platform || 'Cybershock'}
+                  : match.platform || 'Cybershoke'}
               </Badge>
             </div>
             <span className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">

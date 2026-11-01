@@ -51,7 +51,7 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
             className="flex h-10 w-full rounded-md border border-[#222222] bg-[#0a0a0a] px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white focus:border-white cursor-pointer"
           >
             <option value="all" className="bg-[#111111] text-white">Платформа: Все</option>
-            <option value="CYBERSHOCK" className="bg-[#111111] text-white">Cybershock</option>
+            <option value="CYBERSHOCK" className="bg-[#111111] text-white">Cybershoke</option>
             <option value="XPLAY" className="bg-[#111111] text-white">Xplay</option>
             <option value="FASTCUP" className="bg-[#111111] text-white">Fastcup</option>
             <option value="OTHER" className="bg-[#111111] text-white">Другой</option>
@@ -67,8 +67,8 @@ export function ScrimFilters({ filters, onChange, onReset }: ScrimFiltersProps) 
           >
             <option value="all" className="bg-[#111111] text-white">Формат: Все</option>
             <option value="BO1" className="bg-[#111111] text-white">Формат: BO1</option>
-            <option value="BO2" className="bg-[#111111] text-white">Формат: BO2</option>
             <option value="BO3" className="bg-[#111111] text-white">Формат: BO3</option>
+            <option value="BO5" className="bg-[#111111] text-white">Формат: BO5</option>
           </select>
         </div>
 

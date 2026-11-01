@@ -23,7 +23,7 @@ export const slotInputSchema = z.object({
 
 export const scrimCreateSchema = z.object({
   teamId: z.string().min(1, 'Выберите команду'),
-  format: z.nativeEnum(ScrimFormat, { errorMap: () => ({ message: 'Выберите формат (BO1, BO2 или BO3)' }) }),
+  format: z.nativeEnum(ScrimFormat, { errorMap: () => ({ message: 'Выберите формат (BO1, BO3 или BO5)' }) }),
   level: z.string().trim().max(50, 'Уровень не может превышать 50 символов').optional().nullable(),
   serverBy: z.nativeEnum(ServerBy).default(ServerBy.NEGOTIABLE),
   serverLocations: z
@@ -32,12 +32,15 @@ export const scrimCreateSchema = z.object({
     .default([]),
   platform: z
     .enum(['CYBERSHOCK', 'XPLAY', 'FASTCUP', 'OTHER'], {
-      errorMap: () => ({ message: 'Выберите платформу (Cybershock, Xplay, Fastcup или Другой)' }),
+      errorMap: () => ({ message: 'Выберите платформу (Cybershoke, Xplay, Fastcup или Другой)' }),
     })
     .default('CYBERSHOCK'),
   excludedMaps: z
     .array(z.string())
     .max(3, 'Нельзя исключить более 3 карт (в пуле должно оставаться минимум 5 карт)')
+    .default([]),
+  presetMaps: z
+    .array(z.string())
     .default([]),
   comment: z
     .string()
@@ -50,7 +53,19 @@ export const scrimCreateSchema = z.object({
     .min(1, 'Укажите хотя бы один временной слот')
     .max(3, 'Максимум 3 предложения по времени на одну заявку'),
   expiresInDays: z.number().int().min(1).max(14).optional().default(7),
-});
+}).refine(
+  (data) => {
+    if (!data.presetMaps || data.presetMaps.length === 0) return true;
+    if (data.format === 'BO1') return data.presetMaps.length === 1;
+    if (data.format === 'BO3') return data.presetMaps.length === 3;
+    if (data.format === 'BO5') return data.presetMaps.length === 5;
+    return true;
+  },
+  {
+    message: 'Количество выбранных карт должно соответствовать формату встречи',
+    path: ['presetMaps'],
+  }
+);
 
 export const scrimResponseSchema = z
   .object({

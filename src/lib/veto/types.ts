@@ -47,4 +47,5 @@ export interface VetoState {
   currentTurnRole: TeamRole | null;
   currentActionType: VetoType | null;
   currentTargetMap?: string;
+  isPreset?: boolean;
 }

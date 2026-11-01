@@ -154,6 +154,20 @@ export async function POST(
         },
       });
 
+      // If maps were pre-selected by organizer without veto, create MatchMap records immediately
+      if (scrim.presetMaps && scrim.presetMaps.length > 0) {
+        for (let i = 0; i < scrim.presetMaps.length; i++) {
+          await tx.matchMap.create({
+            data: {
+              matchId: createdMatch.id,
+              order: i + 1,
+              map: scrim.presetMaps[i],
+              startSideA: 'CT',
+            },
+          });
+        }
+      }
+
       // Send In-App Notifications
       // For Host team
       for (const m of scrim.team.managers) {

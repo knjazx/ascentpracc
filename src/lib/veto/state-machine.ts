@@ -54,6 +54,44 @@ export function generateVetoSteps(
       ? (lastBanRole === 'TEAM_A' ? 'TEAM_B' : 'TEAM_A')
       : secondRole;
     steps.push({ order: order++, teamRole: deciderSideRole, actionType: VetoType.SIDE });
+  } else if (format === 'BO5') {
+    // Dynamic competitive BO5:
+    // Requires 4 picks and 1 decider = 5 maps.
+    // 1. Initial bans (if more than 5 maps available)
+    const initialBans = totalAvailableMaps >= 7 ? 2 : totalAvailableMaps > 5 ? 1 : 0;
+    if (initialBans >= 1) {
+      steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
+    }
+    if (initialBans >= 2) {
+      steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.BAN });
+    }
+
+    // 2. Picks
+    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
+    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE }); // Opponent picks side
+
+    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
+    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE });
+
+    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
+    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE });
+
+    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
+    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE });
+
+    // 3. Second ban phase: ban down until exactly 1 decider map remains
+    const remainingBans = Math.max(0, totalAvailableMaps - initialBans - 4 - 1);
+    let lastBanRole: TeamRole = secondRole;
+    for (let i = 0; i < remainingBans; i++) {
+      lastBanRole = i % 2 === 0 ? firstRole : secondRole;
+      steps.push({ order: order++, teamRole: lastBanRole, actionType: VetoType.BAN });
+    }
+
+    // 4. Side choice on decider
+    const deciderSideRole: TeamRole = remainingBans > 0
+      ? (lastBanRole === 'TEAM_A' ? 'TEAM_B' : 'TEAM_A')
+      : secondRole;
+    steps.push({ order: order++, teamRole: deciderSideRole, actionType: VetoType.SIDE });
   } else if (format === 'BO2') {
     // BO2 Scrim format: each team picks 1 map, opponent picks starting side
     steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
@@ -82,6 +120,34 @@ export async function getVetoState(matchId: string): Promise<VetoState | null> {
   });
 
   if (!match) return null;
+
+  // If match maps were preset without veto, return finished preset state
+  if (match.maps.length > 0 && match.vetoActions.length === 0) {
+    const pickedMaps: PickedMapResult[] = match.maps.map((m) => ({
+      order: m.order,
+      map: m.map,
+      startSideA: (m.startSideA as 'CT' | 'T') || 'CT',
+    }));
+    return {
+      matchId,
+      format: match.format,
+      status: 'FINISHED',
+      coinFlipWinnerRole: 'TEAM_A',
+      coinFlipWinnerId: match.teamAId,
+      currentStepIndex: 0,
+      steps: [],
+      availableMaps: [],
+      bannedMaps: [],
+      pickedMaps,
+      actions: [],
+      turnExpiresAt: 0,
+      turnDurationSec: TURN_DURATION_SEC,
+      isFinished: true,
+      currentTurnRole: null,
+      currentActionType: null,
+      isPreset: true,
+    };
+  }
 
   // Active maps from DB minus excluded maps
   const activePoolMaps = await prisma.mapPool.findMany({
@@ -279,10 +345,10 @@ export async function processVetoAction(
   state = await getVetoState(matchId);
   if (!state) throw new Error('Не удалось обновить состояние вето');
 
-  // Check if Decider map should be finalized automatically in BO1 or BO3
+  // Check if Decider map should be finalized automatically in BO1, BO3 or BO5
   const currentAvailable = state.availableMaps;
   if (
-    (state.format === 'BO1' || state.format === 'BO3') &&
+    (state.format === 'BO1' || state.format === 'BO3' || state.format === 'BO5') &&
     currentAvailable.length === 1 &&
     !state.pickedMaps.some((p) => p.map === currentAvailable[0])
   ) {

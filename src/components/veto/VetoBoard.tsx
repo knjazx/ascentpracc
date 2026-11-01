@@ -195,7 +195,9 @@ export function VetoBoard({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold uppercase font-mono text-white">
-                  {vetoState.isFinished
+                  {vetoState.isPreset
+                    ? 'Карты выбраны организатором'
+                    : vetoState.isFinished
                     ? 'Вето карт завершено'
                     : `Ход команды [${activeTeamTag}]`}
                 </span>
@@ -207,7 +209,11 @@ export function VetoBoard({
               </div>
 
               <p className="text-xs text-[#a1a1aa] mt-0.5">
-                {vetoState.isFinished ? (
+                {vetoState.isPreset ? (
+                  <span className="text-white font-semibold">
+                    Карты прака назначены организатором без вето. Сервер готов к старту матча.
+                  </span>
+                ) : vetoState.isFinished ? (
                   <span className="text-white font-semibold">
                     Карты утверждены. Сервер готов к старту матча.
                   </span>

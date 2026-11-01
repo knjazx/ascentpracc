@@ -15,7 +15,7 @@ interface TeamSummary {
 }
 
 interface MatchHeaderProps {
-  format: 'BO1' | 'BO2' | 'BO3';
+  format: 'BO1' | 'BO2' | 'BO3' | 'BO5';
   platform?: string;
   status: string;
   scheduledAt: string;
@@ -25,7 +25,7 @@ interface MatchHeaderProps {
 }
 
 const platformLabels: Record<string, string> = {
-  CYBERSHOCK: 'Cybershock',
+  CYBERSHOCK: 'Cybershoke',
   XPLAY: 'Xplay',
   FASTCUP: 'Fastcup',
   OTHER: 'Другой',
@@ -92,7 +92,7 @@ export function MatchHeader({
 
         <div className="flex items-center gap-3">
           <span className="px-2 py-0.5 rounded bg-white/10 text-white border border-white/20 font-bold text-xs uppercase">
-            {platformLabels[platform || 'CYBERSHOCK'] || platform || 'Cybershock'}
+            {platformLabels[platform || 'CYBERSHOCK'] || platform || 'Cybershoke'}
           </span>
           <span className="flex items-center gap-1.5 text-white font-bold">
             <Clock className="w-3.5 h-3.5" />

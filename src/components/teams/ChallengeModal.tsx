@@ -18,9 +18,26 @@ import {
   Handshake,
   Shield,
   ArrowRight,
+  Globe,
+  ListOrdered,
+  Check,
 } from 'lucide-react';
 import { SERVER_LOCATIONS } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
+import { fromZonedTime } from 'date-fns-tz';
+import { getSystemTimezone } from '@/lib/date';
+import { TIMEZONE_OPTIONS } from '@/lib/timezones';
+
+const CS2_MAPS = [
+  { id: 'de_dust2', name: 'Dust2', image: '/maps/de_dust2.webp' },
+  { id: 'de_mirage', name: 'Mirage', image: '/maps/de_mirage.webp' },
+  { id: 'de_nuke', name: 'Nuke', image: '/maps/de_nuke.webp' },
+  { id: 'de_ancient', name: 'Ancient', image: '/maps/de_ancient.webp' },
+  { id: 'de_inferno', name: 'Inferno', image: '/maps/de_inferno.webp' },
+  { id: 'de_anubis', name: 'Anubis', image: '/maps/de_anubis.webp' },
+  { id: 'de_cache', name: 'Cache', image: '/maps/de_cache.webp' },
+  { id: 'de_vertigo', name: 'Vertigo', image: '/maps/de_vertigo.webp' },
+];
 
 interface SlotItem {
   id: string;
@@ -59,9 +76,12 @@ export function ChallengeModal({
   const router = useRouter();
 
   const [challengerTeamId, setChallengerTeamId] = useState(userTeams[0]?.id || '');
-  const [format, setFormat] = useState<'BO1' | 'BO2' | 'BO3'>('BO1');
+  const [format, setFormat] = useState<'BO1' | 'BO3' | 'BO5'>('BO1');
   const [platform, setPlatform] = useState<'CYBERSHOCK' | 'XPLAY' | 'FASTCUP' | 'OTHER'>('CYBERSHOCK');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [mapSelectionMode, setMapSelectionMode] = useState<'VETO' | 'PRESET'>('VETO');
+  const [presetMaps, setPresetMaps] = useState<string[]>([]);
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(() => getSystemTimezone());
   const [isServerDropdownOpen, setIsServerDropdownOpen] = useState(false);
   const serverDropdownRef = React.useRef<HTMLDivElement>(null);
   const [comment, setComment] = useState('');
@@ -150,6 +170,30 @@ export function ChallengeModal({
     );
   };
 
+  const requiredPresetMapsCount = format === 'BO1' ? 1 : format === 'BO3' ? 3 : 5;
+
+  const handleFormatChange = (newFormat: 'BO1' | 'BO3' | 'BO5') => {
+    setFormat(newFormat);
+    const maxAllowed = newFormat === 'BO1' ? 1 : newFormat === 'BO3' ? 3 : 5;
+    if (presetMaps.length > maxAllowed) {
+      setPresetMaps(presetMaps.slice(0, maxAllowed));
+    }
+  };
+
+  const togglePresetMap = (mapId: string) => {
+    if (presetMaps.includes(mapId)) {
+      setPresetMaps(presetMaps.filter((m) => m !== mapId));
+      setError(null);
+    } else {
+      if (presetMaps.length >= requiredPresetMapsCount) {
+        setError(`Для формата ${format} можно выбрать только ${requiredPresetMapsCount} ${requiredPresetMapsCount === 1 ? 'карту' : 'карт(ы)'}`);
+        return;
+      }
+      setError(null);
+      setPresetMaps([...presetMaps, mapId]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -174,21 +218,28 @@ export function ChallengeModal({
       return;
     }
 
+    if (mapSelectionMode === 'PRESET' && presetMaps.length !== requiredPresetMapsCount) {
+      setError(`Для формата ${format} необходимо выбрать ровно ${requiredPresetMapsCount} ${requiredPresetMapsCount === 1 ? 'карту' : 'карт(ы)'}`);
+      setLoading(false);
+      return;
+    }
+
     try {
+      const activeTz = !selectedTimezone || selectedTimezone === 'SYSTEM' ? getSystemTimezone() : selectedTimezone;
       const maxFutureTime = Date.now() + 5 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000;
       const formattedSlots = slots.map((s) => {
-        const localDate = new Date(`${s.date}T${s.time}:00`);
-        if (isNaN(localDate.getTime())) {
+        const utcDate = fromZonedTime(`${s.date}T${s.time}:00`, activeTz);
+        if (isNaN(utcDate.getTime())) {
           throw new Error('Некорректная дата или время слота');
         }
-        if (localDate.getTime() <= Date.now()) {
-          throw new Error(`Слот ${s.date} ${s.time} должен быть в будущем`);
+        if (utcDate.getTime() <= Date.now()) {
+          throw new Error(`Слот ${s.date} ${s.time} (${activeTz}) должен быть в будущем`);
         }
-        if (localDate.getTime() > maxFutureTime) {
+        if (utcDate.getTime() > maxFutureTime) {
           throw new Error(`Время прака (${s.date} ${s.time}) не может превышать 5 дней от текущего момента`);
         }
         return {
-          startsAt: localDate.toISOString(),
+          startsAt: utcDate.toISOString(),
           durationMin: Number(s.durationMin),
         };
       });
@@ -202,6 +253,7 @@ export function ChallengeModal({
           format,
           platform,
           serverLocations: selectedLocations,
+          presetMaps: mapSelectionMode === 'PRESET' ? presetMaps : [],
           slots: formattedSlots,
           comment: comment.trim(),
         }),
@@ -338,11 +390,11 @@ export function ChallengeModal({
                     Формат встречи *
                   </label>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {(['BO1', 'BO2', 'BO3'] as const).map((fmt) => (
+                    {(['BO1', 'BO3', 'BO5'] as const).map((fmt) => (
                       <button
                         key={fmt}
                         type="button"
-                        onClick={() => setFormat(fmt)}
+                        onClick={() => handleFormatChange(fmt)}
                         className={`h-9 rounded-lg text-xs font-mono font-bold uppercase transition-all ${
                           format === fmt
                             ? 'bg-white text-black font-black'
@@ -364,7 +416,7 @@ export function ChallengeModal({
                     onChange={(e) => setPlatform(e.target.value as any)}
                     className="flex h-9 w-full rounded-lg border border-[#262626] bg-[#141414] px-3 py-1.5 text-xs text-white focus-visible:outline-none focus-visible:border-white cursor-pointer font-bold"
                   >
-                    <option value="CYBERSHOCK" className="bg-[#141414]">Cybershock</option>
+                    <option value="CYBERSHOCK" className="bg-[#141414]">Cybershoke</option>
                     <option value="XPLAY" className="bg-[#141414]">Xplay</option>
                     <option value="FASTCUP" className="bg-[#141414]">Fastcup</option>
                     <option value="OTHER" className="bg-[#141414]">Другой</option>
@@ -465,9 +517,103 @@ export function ChallengeModal({
                 </div>
               </div>
 
+              {/* Map Selection (Veto vs Preset) */}
+              <div className="space-y-3 p-3.5 rounded-xl border border-[#242424] bg-[#090909]">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white font-mono flex items-center gap-1.5">
+                      <ListOrdered className="w-3.5 h-3.5 text-white" />
+                      <span>Выбор карт</span>
+                    </label>
+                    <p className="text-[10px] text-[#a1a1aa]">
+                      {mapSelectionMode === 'PRESET'
+                        ? `Прямой выбор ${requiredPresetMapsCount} карт без вето`
+                        : 'Вето карт перед матчем в лобби'}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-[#141414] p-0.5 rounded-lg border border-[#222222]">
+                    <button
+                      type="button"
+                      onClick={() => setMapSelectionMode('VETO')}
+                      className={`px-2 py-1 rounded text-[11px] font-mono font-bold transition-all ${
+                        mapSelectionMode === 'VETO'
+                          ? 'bg-white text-black font-black'
+                          : 'text-[#a1a1aa] hover:text-white'
+                      }`}
+                    >
+                      Вето в лобби
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMapSelectionMode('PRESET')}
+                      className={`px-2 py-1 rounded text-[11px] font-mono font-bold transition-all ${
+                        mapSelectionMode === 'PRESET'
+                          ? 'bg-white text-black font-black'
+                          : 'text-[#a1a1aa] hover:text-white'
+                      }`}
+                    >
+                      Выбрать заранее ({requiredPresetMapsCount})
+                    </button>
+                  </div>
+                </div>
+
+                {mapSelectionMode === 'PRESET' && (
+                  <div className="space-y-2 pt-1 border-t border-[#1a1a1a]">
+                    <div className="flex items-center justify-between text-[11px] text-[#a1a1aa]">
+                      <span>
+                        Выбрано карт: {presetMaps.length}/{requiredPresetMapsCount}
+                      </span>
+                      {presetMaps.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPresetMaps([])}
+                          className="text-[10px] text-white hover:underline font-mono"
+                        >
+                          Сбросить
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {CS2_MAPS.map((map) => {
+                        const selectedIdx = presetMaps.indexOf(map.id);
+                        const isSelected = selectedIdx !== -1;
+                        const isMaxReached = presetMaps.length >= requiredPresetMapsCount && !isSelected;
+
+                        return (
+                          <div
+                            key={map.id}
+                            onClick={() => togglePresetMap(map.id)}
+                            className={`p-1.5 rounded-lg border text-center transition-all select-none cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-950/40 border-emerald-400 text-white font-bold'
+                                : isMaxReached
+                                ? 'bg-[#101010] border-[#1e1e1e] opacity-40 cursor-not-allowed text-[#71717a]'
+                                : 'bg-[#141414] border-[#222222] text-[#a1a1aa] hover:border-[#383838]'
+                            }`}
+                          >
+                            <div className="relative aspect-[3/2] rounded overflow-hidden mb-1">
+                              <img src={map.image} alt={map.name} className="w-full h-full object-cover" />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-emerald-950/70 flex items-center justify-center">
+                                  <span className="text-[10px] font-mono font-black text-emerald-300">
+                                    #{selectedIdx + 1}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[10px] block truncate">{map.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Time Slots (1-3 slots, max 5 days) */}
               <div className="space-y-2.5 p-3.5 rounded-xl border border-[#242424] bg-[#090909]">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <label className="text-xs font-semibold uppercase tracking-wider text-white font-mono flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-white" />
@@ -478,17 +624,35 @@ export function ChallengeModal({
                     </span>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addSlot}
-                    disabled={slots.length >= 3}
-                    className="h-7 text-[11px] gap-1 font-mono"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Время</span>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {/* Inline Timezone Selector */}
+                    <div className="flex items-center gap-1 bg-[#141414] border border-[#262626] px-2 py-0.5 rounded-md">
+                      <Globe className="w-3 h-3 text-[#a1a1aa] shrink-0" />
+                      <select
+                        value={selectedTimezone}
+                        onChange={(e) => setSelectedTimezone(e.target.value)}
+                        className="bg-transparent text-white text-[11px] font-mono focus:outline-none cursor-pointer max-w-[140px] truncate"
+                      >
+                        {TIMEZONE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value} className="bg-[#111111] text-white">
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addSlot}
+                      disabled={slots.length >= 3}
+                      className="h-7 text-[11px] gap-1 font-mono shrink-0"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Время</span>
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

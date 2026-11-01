@@ -30,12 +30,13 @@ function getWinRateColor(rate: number) {
 
 export interface ScrimCardData {
   id: string;
-  format: 'BO1' | 'BO2' | 'BO3';
+  format: 'BO1' | 'BO2' | 'BO3' | 'BO5';
   platform?: string;
   level: string | null;
   serverBy: 'HOST' | 'GUEST' | 'NEGOTIABLE';
   serverLocations?: string[];
   excludedMaps: string[];
+  presetMaps?: string[];
   comment: string | null;
   status: string;
   expiresAt: string;
@@ -70,7 +71,7 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
   };
 
   const platformLabels: Record<string, string> = {
-    CYBERSHOCK: 'Cybershock',
+    CYBERSHOCK: 'Cybershoke',
     XPLAY: 'Xplay',
     FASTCUP: 'Fastcup',
     OTHER: 'Другой',
@@ -155,7 +156,7 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
         <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
           <span className="px-2 py-0.5 rounded bg-[#161616] text-[#a1a1aa] border border-[#222222] font-semibold flex items-center gap-1">
             <Globe className="w-3 h-3 text-white" />
-            <span>{platformLabels[scrim.platform || 'CYBERSHOCK'] || scrim.platform || 'Cybershock'}</span>
+            <span>{platformLabels[scrim.platform || 'CYBERSHOCK'] || scrim.platform || 'Cybershoke'}</span>
           </span>
 
           <span className="px-2 py-0.5 rounded bg-[#161616] border border-[#222222] text-[#a1a1aa] flex items-center gap-1.5">
@@ -224,8 +225,37 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
           </div>
         </div>
 
-        {/* Excluded Maps */}
-        {(scrim.excludedMaps?.length ?? 0) > 0 && (
+        {/* Preset Maps or Excluded Maps */}
+        {scrim.presetMaps && scrim.presetMaps.length > 0 ? (
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-mono">
+            <span className="text-emerald-400 font-bold">
+              {scrim.presetMaps.length === 1 ? 'Карта:' : 'Карты:'}
+            </span>
+            {scrim.presetMaps.map((map, idx) => {
+              const rawName = map.replace('de_', '');
+              const displayName = rawName === 'dust2' ? 'Dust2' : rawName.charAt(0).toUpperCase() + rawName.slice(1);
+              return (
+                <span
+                  key={map}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/30 text-emerald-300 border border-emerald-500/30"
+                >
+                  {scrim.presetMaps!.length > 1 && (
+                    <span className="text-[10px] text-emerald-400 font-black">#{idx + 1}</span>
+                  )}
+                  <img
+                    src={`/maps/${map}.webp`}
+                    alt=""
+                    className="w-4 h-2.5 rounded-[2px] object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                  <span>{displayName}</span>
+                </span>
+              );
+            })}
+          </div>
+        ) : (scrim.excludedMaps?.length ?? 0) > 0 ? (
           <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-mono text-[#a1a1aa]">
             <Ban className="w-3 h-3 text-[#ef4444]" />
             <span>Исключены:</span>
@@ -249,6 +279,10 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
                 </span>
               );
             })}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#71717a]">
+            <span>Вето карт в лобби</span>
           </div>
         )}
 

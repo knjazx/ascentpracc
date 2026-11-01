@@ -13,7 +13,7 @@ import { getClientCache, setClientCache } from '@/lib/client-cache';
 
 interface MatchItem {
   id: string;
-  format: 'BO1' | 'BO2' | 'BO3';
+  format: 'BO1' | 'BO2' | 'BO3' | 'BO5';
   status: 'SCHEDULED' | 'VETO' | 'LIVE' | 'AWAITING_RESULT' | 'CONFIRMED' | 'DISPUTED' | 'CANCELLED';
   scheduledAt: string;
   winnerId: string | null;
@@ -187,7 +187,7 @@ export default function MatchesPage() {
         {/* Format selector */}
         <div className="flex items-center gap-1.5 text-xs text-[#a1a1aa]">
           <span>Формат:</span>
-          {['', 'BO1', 'BO2', 'BO3'].map((f) => (
+          {['', 'BO1', 'BO3', 'BO5'].map((f) => (
             <button
               key={f}
               onClick={() => { setFormat(f); setPage(1); }}

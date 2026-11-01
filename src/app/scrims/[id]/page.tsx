@@ -49,12 +49,13 @@ import { getClientCache, setClientCache, clearClientCache } from '@/lib/client-c
 
 interface ScrimDetail {
   id: string;
-  format: 'BO1' | 'BO2' | 'BO3';
+  format: 'BO1' | 'BO2' | 'BO3' | 'BO5';
   platform?: string;
   level: string | null;
   serverBy: 'HOST' | 'GUEST' | 'NEGOTIABLE';
   serverLocations?: string[];
   excludedMaps: string[];
+  presetMaps?: string[];
   comment: string | null;
   status: 'OPEN' | 'MATCHED' | 'CANCELLED' | 'EXPIRED';
   expiresAt: string;
@@ -367,7 +368,7 @@ export default function ScrimDetailPage() {
   };
 
   const platformLabels: Record<string, string> = {
-    CYBERSHOCK: 'Cybershock',
+    CYBERSHOCK: 'Cybershoke',
     XPLAY: 'Xplay',
     FASTCUP: 'Fastcup',
     OTHER: 'Другой',
@@ -579,7 +580,7 @@ export default function ScrimDetailPage() {
                 <Gamepad2 className="w-3.5 h-3.5 text-white" />
               </div>
               <p className="font-mono font-bold text-white text-base mt-2 truncate">
-                {platformLabels[scrim.platform || 'CYBERSHOCK'] || scrim.platform || 'Cybershock'}
+                {platformLabels[scrim.platform || 'CYBERSHOCK'] || scrim.platform || 'Cybershoke'}
               </p>
             </div>
 
@@ -667,83 +668,140 @@ export default function ScrimDetailPage() {
             </div>
           </div>
 
-          {/* Map Pool */}
+          {/* Map Pool / Preset Maps */}
           <div className="p-4 rounded-xl border border-[#2a2a2a] bg-[#0c0c0c] space-y-3 shadow-sm">
             <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider border-b border-[#222222] pb-3">
               <div className="flex items-center gap-2 text-white">
                 <MapPin className="w-4 h-4 text-white" />
-                <span>Маппул встречи</span>
+                <span>
+                  {scrim.presetMaps && scrim.presetMaps.length > 0
+                    ? `Карты матча (выбраны заранее без вето: ${scrim.presetMaps.length})`
+                    : 'Маппул встречи (вето в лобби)'}
+                </span>
               </div>
               <div className="flex items-center gap-2 text-[11px] text-[#a1a1aa]">
-                <span className="text-white font-bold">{ALL_POOL_MAPS.length - scrim.excludedMaps.length} в пуле</span>
-                {scrim.excludedMaps.length > 0 && (
+                {scrim.presetMaps && scrim.presetMaps.length > 0 ? (
+                  <span className="text-emerald-400 font-bold">Вето не требуется</span>
+                ) : (
                   <>
-                    <span>•</span>
-                    <span className="text-red-400 font-bold">{scrim.excludedMaps.length} забанено</span>
+                    <span className="text-white font-bold">{ALL_POOL_MAPS.length - scrim.excludedMaps.length} в пуле</span>
+                    {scrim.excludedMaps.length > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="text-red-400 font-bold">{scrim.excludedMaps.length} забанено</span>
+                      </>
+                    )}
                   </>
                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
-              {ALL_POOL_MAPS.map((map) => {
-                const isExcluded = scrim.excludedMaps.includes(map.id);
-                return (
-                  <div
-                    key={map.id}
-                    className={`relative flex flex-col items-center p-2 rounded-xl border transition-all select-none ${
-                      isExcluded
-                        ? 'bg-red-950/25 border-2 border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
-                        : 'bg-[#181818] border border-[#333333]'
-                    }`}
-                  >
-                    {/* Map Thumbnail */}
+            {scrim.presetMaps && scrim.presetMaps.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+                {scrim.presetMaps.map((mapId, index) => {
+                  const mapInfo = ALL_POOL_MAPS.find((m) => m.id === mapId) || {
+                    id: mapId,
+                    name: mapId.replace('de_', '').toUpperCase(),
+                    image: `/maps/${mapId}.webp`,
+                  };
+                  const isDecider = index === scrim.presetMaps!.length - 1 && scrim.presetMaps!.length > 1;
+
+                  return (
                     <div
-                      className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border ${
-                        isExcluded ? 'border-red-500/40' : 'border-white/10'
-                      }`}
+                      key={mapId}
+                      className="relative flex flex-col p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-950/20 shadow-[0_0_15px_rgba(52,211,153,0.15)]"
                     >
-                      <img
-                        src={map.image}
-                        alt={map.name}
-                        className={`w-full h-full object-cover ${
-                          isExcluded ? 'grayscale opacity-40 scale-95' : ''
-                        }`}
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                      {isExcluded && (
-                        <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
-                          <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
-                          <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
-                            БАН
-                          </span>
+                      <div className="relative w-full aspect-[16/9] overflow-hidden rounded-lg border border-emerald-500/30">
+                        <img
+                          src={mapInfo.image}
+                          alt={mapInfo.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm border border-emerald-400/50 text-[10px] font-mono font-black text-emerald-300">
+                          {scrim.presetMaps!.length === 1
+                            ? 'ОСНОВНАЯ'
+                            : isDecider
+                            ? `КАРТА #${index + 1} (DECIDER)`
+                            : `КАРТА #${index + 1}`}
                         </div>
-                      )}
+                      </div>
+
+                      <div className="mt-2.5 flex items-center justify-between">
+                        <span className="text-sm font-bold text-white tracking-wide">
+                          {mapInfo.name}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase">
+                          {isDecider ? 'Decider' : `Матч #${index + 1}`}
+                        </span>
+                      </div>
                     </div>
-
-                    {/* Map Name */}
-                    <span
-                      className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
-                        isExcluded ? 'text-red-400 line-through' : 'text-white'
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
+                {ALL_POOL_MAPS.map((map) => {
+                  const isExcluded = scrim.excludedMaps.includes(map.id);
+                  return (
+                    <div
+                      key={map.id}
+                      className={`relative flex flex-col items-center p-2 rounded-xl border transition-all select-none ${
+                        isExcluded
+                          ? 'bg-red-950/25 border-2 border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
+                          : 'bg-[#181818] border border-[#333333]'
                       }`}
                     >
-                      {map.name}
-                    </span>
+                      {/* Map Thumbnail */}
+                      <div
+                        className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border ${
+                          isExcluded ? 'border-red-500/40' : 'border-white/10'
+                        }`}
+                      >
+                        <img
+                          src={map.image}
+                          alt={map.name}
+                          className={`w-full h-full object-cover ${
+                            isExcluded ? 'grayscale opacity-40 scale-95' : ''
+                          }`}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        {isExcluded && (
+                          <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                            <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
+                            <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
+                              БАН
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Status Badge */}
-                    <span
-                      className={`text-[10px] font-mono font-semibold ${
-                        isExcluded ? 'text-red-400 uppercase' : 'text-[#888888]'
-                      }`}
-                    >
-                      {isExcluded ? 'Забанена' : 'В пуле'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                      {/* Map Name */}
+                      <span
+                        className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
+                          isExcluded ? 'text-red-400 line-through' : 'text-white'
+                        }`}
+                      >
+                        {map.name}
+                      </span>
+
+                      {/* Status Badge */}
+                      <span
+                        className={`text-[10px] font-mono font-semibold ${
+                          isExcluded ? 'text-red-400 uppercase' : 'text-[#888888]'
+                        }`}
+                      >
+                        {isExcluded ? 'Забанена' : 'В пуле'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Comment */}

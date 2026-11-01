@@ -135,6 +135,20 @@ export async function POST(
         },
       });
 
+      // If maps were pre-selected by organizer without veto, create MatchMap records immediately
+      if (challenge.presetMaps && challenge.presetMaps.length > 0) {
+        for (let i = 0; i < challenge.presetMaps.length; i++) {
+          await tx.matchMap.create({
+            data: {
+              matchId: match.id,
+              order: i + 1,
+              map: challenge.presetMaps[i],
+              startSideA: 'CT',
+            },
+          });
+        }
+      }
+
       // Update challenge status
       await tx.scrimRequest.update({
         where: { id: challenge.id },

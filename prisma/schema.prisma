@@ -17,6 +17,7 @@ enum ScrimFormat {
   BO1
   BO2
   BO3
+  BO5
 }
 
 enum ServerBy {
@@ -155,7 +156,8 @@ model ScrimRequest {
   serverBy        ServerBy    @default(NEGOTIABLE)
   serverLocations String[]    @default([])
   platform        String      @default("CYBERSHOCK")
-  excludedMaps String[]    @default([])
+  excludedMaps    String[]    @default([])
+  presetMaps      String[]    @default([])
   comment      String?
   status       ScrimStatus @default(OPEN)
   expiresAt    DateTime

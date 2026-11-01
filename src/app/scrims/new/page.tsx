@@ -25,13 +25,17 @@ import {
   ArrowRight,
   ChevronDown,
   X,
+  ListOrdered,
 } from 'lucide-react';
 import { SERVER_LOCATIONS } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { clearClientCache } from '@/lib/client-cache';
+import { fromZonedTime } from 'date-fns-tz';
+import { getSystemTimezone } from '@/lib/date';
+import { TIMEZONE_OPTIONS } from '@/lib/timezones';
 
 const PLATFORMS: Array<{ id: 'CYBERSHOCK' | 'XPLAY' | 'FASTCUP' | 'OTHER'; name: string }> = [
-  { id: 'CYBERSHOCK', name: 'Cybershock' },
+  { id: 'CYBERSHOCK', name: 'Cybershoke' },
   { id: 'XPLAY', name: 'Xplay' },
   { id: 'FASTCUP', name: 'Fastcup' },
   { id: 'OTHER', name: 'Другой' },
@@ -63,10 +67,16 @@ function CreateScrimForm() {
   const { user } = useUser();
 
   const [teamId, setTeamId] = useState(user?.teams[0]?.id || '');
-  const [format, setFormat] = useState<'BO1' | 'BO2' | 'BO3'>('BO1');
+  const [format, setFormat] = useState<'BO1' | 'BO3' | 'BO5'>('BO1');
   const [platform, setPlatform] = useState<'CYBERSHOCK' | 'XPLAY' | 'FASTCUP' | 'OTHER'>('CYBERSHOCK');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [mapSelectionMode, setMapSelectionMode] = useState<'VETO' | 'PRESET'>('VETO');
   const [excludedMaps, setExcludedMaps] = useState<string[]>([]);
+  const [presetMaps, setPresetMaps] = useState<string[]>([]);
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
+    if (user?.timezone && user.timezone !== 'SYSTEM') return user.timezone;
+    return getSystemTimezone();
+  });
   const [comment, setComment] = useState(() => {
     if (opponentTag) return `Прямой вызов команде [${opponentTag}]`;
     return '';
@@ -138,6 +148,16 @@ function CreateScrimForm() {
     };
   }, [teamId, user?.teams]);
 
+  const requiredPresetMapsCount = format === 'BO1' ? 1 : format === 'BO3' ? 3 : 5;
+
+  const handleFormatChange = (newFormat: 'BO1' | 'BO3' | 'BO5') => {
+    setFormat(newFormat);
+    const maxAllowed = newFormat === 'BO1' ? 1 : newFormat === 'BO3' ? 3 : 5;
+    if (presetMaps.length > maxAllowed) {
+      setPresetMaps(presetMaps.slice(0, maxAllowed));
+    }
+  };
+
   const toggleMapExcluded = (mapId: string) => {
     if (excludedMaps.includes(mapId)) {
       setExcludedMaps(excludedMaps.filter((m) => m !== mapId));
@@ -148,6 +168,20 @@ function CreateScrimForm() {
       }
       setError(null);
       setExcludedMaps([...excludedMaps, mapId]);
+    }
+  };
+
+  const togglePresetMap = (mapId: string) => {
+    if (presetMaps.includes(mapId)) {
+      setPresetMaps(presetMaps.filter((m) => m !== mapId));
+      setError(null);
+    } else {
+      if (presetMaps.length >= requiredPresetMapsCount) {
+        setError(`Для формата ${format} можно выбрать только ${requiredPresetMapsCount} ${requiredPresetMapsCount === 1 ? 'карту' : 'карт(ы)'}`);
+        return;
+      }
+      setError(null);
+      setPresetMaps([...presetMaps, mapId]);
     }
   };
 
@@ -218,22 +252,29 @@ function CreateScrimForm() {
       return;
     }
 
+    if (mapSelectionMode === 'PRESET' && presetMaps.length !== requiredPresetMapsCount) {
+      setError(`Для формата ${format} необходимо выбрать ровно ${requiredPresetMapsCount} ${requiredPresetMapsCount === 1 ? 'карту' : 'карт(ы)'}`);
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Convert slots to ISO 8601 UTC strings
+      // Convert slots to ISO 8601 UTC strings taking user selected timezone into account
+      const activeTz = !selectedTimezone || selectedTimezone === 'SYSTEM' ? getSystemTimezone() : selectedTimezone;
       const maxFutureTime = Date.now() + 5 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000;
       const formattedSlots = slots.map((s) => {
-        const localDate = new Date(`${s.date}T${s.time}:00`);
-        if (isNaN(localDate.getTime())) {
+        const utcDate = fromZonedTime(`${s.date}T${s.time}:00`, activeTz);
+        if (isNaN(utcDate.getTime())) {
           throw new Error('Некорректная дата или время слота');
         }
-        if (localDate.getTime() <= Date.now()) {
-          throw new Error(`Слот ${s.date} ${s.time} должен быть в будущем`);
+        if (utcDate.getTime() <= Date.now()) {
+          throw new Error(`Слот ${s.date} ${s.time} (${activeTz}) должен быть в будущем`);
         }
-        if (localDate.getTime() > maxFutureTime) {
+        if (utcDate.getTime() > maxFutureTime) {
           throw new Error(`Время прака (${s.date} ${s.time}) не может превышать 5 дней от текущего момента`);
         }
         return {
-          startsAt: localDate.toISOString(),
+          startsAt: utcDate.toISOString(),
           durationMin: Number(s.durationMin),
         };
       });
@@ -252,7 +293,8 @@ function CreateScrimForm() {
           level: null,
           serverBy: selectedLocations.length > 0 ? 'HOST' : 'NEGOTIABLE',
           serverLocations: selectedLocations,
-          excludedMaps,
+          excludedMaps: mapSelectionMode === 'VETO' ? excludedMaps : [],
+          presetMaps: mapSelectionMode === 'PRESET' ? presetMaps : [],
           comment: comment.trim() || null,
           slots: formattedSlots,
           expiresInDays,
@@ -383,11 +425,11 @@ function CreateScrimForm() {
                   Формат встречи *
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {(['BO1', 'BO2', 'BO3'] as const).map((fmt) => (
+                  {(['BO1', 'BO3', 'BO5'] as const).map((fmt) => (
                     <button
                       key={fmt}
                       type="button"
-                      onClick={() => setFormat(fmt)}
+                      onClick={() => handleFormatChange(fmt)}
                       className={`h-10 rounded-md text-sm font-mono font-bold uppercase transition-all ${
                         format === fmt
                           ? 'bg-white text-black font-black'
@@ -618,8 +660,8 @@ function CreateScrimForm() {
 
             {/* Dynamic Time Slots Builder */}
             <div className="space-y-3 p-4 rounded-xl border border-[#2a2a2a] bg-[#0c0c0c] shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#222222] pb-3">
-                <div className="space-y-0.5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#222222] pb-3">
+                <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <label className="text-xs font-semibold uppercase tracking-wider text-white flex items-center gap-1.5 font-mono">
                       <Calendar className="w-3.5 h-3.5 text-white" />
@@ -636,21 +678,40 @@ function CreateScrimForm() {
                     </span>
                   </div>
                   <p className="text-[11px] text-[#a1a1aa]">
-                    Укажите от 1 до 3 вариантов (макс. через 5 дней). По часовому поясу: {user.timezone}
+                    Укажите от 1 до 3 вариантов (макс. через 5 дней). Выберите часовой пояс, по которому задаёте время.
                   </p>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addSlot}
-                  disabled={slots.length >= 3}
-                  className="gap-1 text-xs shrink-0 font-medium"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Добавить время {slots.length >= 3 ? '(макс. 3)' : ''}</span>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Inline Timezone Selector */}
+                  <div className="flex items-center gap-1.5 bg-[#141414] border border-[#2e2e2e] px-2.5 py-1 rounded-lg">
+                    <Globe className="w-3.5 h-3.5 text-white shrink-0" />
+                    <span className="text-[11px] text-[#a1a1aa] font-mono whitespace-nowrap">Пояс:</span>
+                    <select
+                      value={selectedTimezone}
+                      onChange={(e) => setSelectedTimezone(e.target.value)}
+                      className="bg-transparent text-white text-xs font-mono font-semibold focus:outline-none cursor-pointer max-w-[180px] sm:max-w-[220px] truncate"
+                    >
+                      {TIMEZONE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value} className="bg-[#111111] text-white">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addSlot}
+                    disabled={slots.length >= 3}
+                    className="gap-1 text-xs shrink-0 font-medium"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Добавить {slots.length >= 3 ? '(макс. 3)' : ''}</span>
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2.5 pt-1">
@@ -706,103 +767,222 @@ function CreateScrimForm() {
               </div>
             </div>
 
-            {/* Excluded Maps */}
-            <div className="space-y-3 p-4 rounded-xl border border-[#2a2a2a] bg-[#0c0c0c] shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#222222] pb-3">
+            {/* Map Selection Section (Veto vs Preset Maps) */}
+            <div className="space-y-4 p-4 rounded-xl border border-[#2a2a2a] bg-[#0c0c0c] shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#222222] pb-3">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <label className="text-xs font-semibold uppercase tracking-wider text-white flex items-center gap-1.5 font-mono">
-                      <Ban className="w-3.5 h-3.5 text-white" />
-                      <span>Исключить нежелательные карты</span>
+                      <ListOrdered className="w-3.5 h-3.5 text-white" />
+                      <span>Выбор карт</span>
                     </label>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border transition-colors ${
-                        excludedMaps.length > 0
-                          ? 'bg-red-500/15 text-red-400 border-red-500/30'
-                          : 'bg-[#181818] text-[#71717a] border-[#2e2e2e]'
-                      }`}
-                    >
-                      {excludedMaps.length}/3 исключено
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-[#141414] border border-[#2a2a2a] text-white">
+                      {mapSelectionMode === 'PRESET'
+                        ? `${presetMaps.length}/${requiredPresetMapsCount} выбрано`
+                        : `${excludedMaps.length}/3 исключено`}
                     </span>
                   </div>
                   <p className="text-[11px] text-[#a1a1aa]">
-                    Нажмите на карту, чтобы исключить её из прака (максимум 3)
+                    {mapSelectionMode === 'PRESET'
+                      ? `Прямой выбор карт для игры без стадии вето (для ${format} нужно ${requiredPresetMapsCount} ${requiredPresetMapsCount === 1 ? 'карта' : 'карты'})`
+                      : 'Стандартная стадия пик/бан перед матчем в лобби с возможностью исключить до 3 карт'}
                   </p>
                 </div>
 
-                {excludedMaps.length > 0 && (
+                {/* Mode Switcher */}
+                <div className="flex items-center gap-1 bg-[#141414] p-1 rounded-lg border border-[#222222] shrink-0 self-start sm:self-auto">
                   <button
                     type="button"
-                    onClick={() => setExcludedMaps([])}
-                    className="text-xs text-[#a1a1aa] hover:text-white px-2.5 py-1 rounded bg-[#161616] border border-[#2e2e2e] hover:border-[#444444] transition-all self-start sm:self-auto font-medium"
+                    onClick={() => {
+                      setMapSelectionMode('VETO');
+                      setError(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all ${
+                      mapSelectionMode === 'VETO'
+                        ? 'bg-white text-black font-black'
+                        : 'text-[#a1a1aa] hover:text-white'
+                    }`}
                   >
-                    Сбросить выбор
+                    Вето в лобби
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMapSelectionMode('PRESET');
+                      setError(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all ${
+                      mapSelectionMode === 'PRESET'
+                        ? 'bg-white text-black font-black'
+                        : 'text-[#a1a1aa] hover:text-white'
+                    }`}
+                  >
+                    Выбрать заранее ({format}: {requiredPresetMapsCount})
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
-                {CS2_MAPS.map((map) => {
-                  const isExcluded = excludedMaps.includes(map.id);
-                  return (
-                    <button
-                      key={map.id}
-                      type="button"
-                      onClick={() => toggleMapExcluded(map.id)}
-                      className={`group relative flex flex-col items-center p-2 rounded-xl border transition-all duration-200 select-none ${
-                        isExcluded
-                          ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.25)] ring-1 ring-red-500/30'
-                          : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
-                      }`}
-                    >
-                      {/* Map Thumbnail */}
-                      <div
-                        className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
-                          isExcluded ? 'border-red-500/40' : 'border-white/10 group-hover:border-white/25'
-                        }`}
+              {mapSelectionMode === 'VETO' ? (
+                /* Mode 1: Veto in Lobby (with optional bans) */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-[#a1a1aa]">
+                    <span>Нажмите на карту, чтобы исключить её из вето (максимум 3)</span>
+                    {excludedMaps.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setExcludedMaps([])}
+                        className="text-xs text-[#a1a1aa] hover:text-white px-2 py-0.5 rounded bg-[#161616] border border-[#2e2e2e] hover:border-[#444444] transition-all font-medium"
                       >
-                        <img
-                          src={map.image}
-                          alt={map.name}
-                          className={`w-full h-full object-cover transition-all duration-200 ${
+                        Сбросить бан
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
+                    {CS2_MAPS.map((map) => {
+                      const isExcluded = excludedMaps.includes(map.id);
+                      return (
+                        <button
+                          key={map.id}
+                          type="button"
+                          onClick={() => toggleMapExcluded(map.id)}
+                          className={`group relative flex flex-col items-center p-2 rounded-xl border transition-all duration-200 select-none ${
                             isExcluded
-                              ? 'grayscale opacity-40 scale-95'
-                              : 'group-hover:scale-105'
+                              ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.25)] ring-1 ring-red-500/30'
+                              : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
                           }`}
-                        />
-                        {isExcluded && (
-                          <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
-                            <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
-                            <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
-                              БАН
-                            </span>
+                        >
+                          <div
+                            className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                              isExcluded ? 'border-red-500/40' : 'border-white/10 group-hover:border-white/25'
+                            }`}
+                          >
+                            <img
+                              src={map.image}
+                              alt={map.name}
+                              className={`w-full h-full object-cover transition-all duration-200 ${
+                                isExcluded ? 'grayscale opacity-40 scale-95' : 'group-hover:scale-105'
+                              }`}
+                            />
+                            {isExcluded && (
+                              <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
+                                <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
+                                  БАН
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-
-                      {/* Map Name */}
-                      <span
-                        className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
-                          isExcluded
-                            ? 'text-red-400 line-through'
-                            : 'text-white group-hover:text-white'
-                        }`}
+                          <span
+                            className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
+                              isExcluded ? 'text-red-400 line-through' : 'text-white group-hover:text-white'
+                            }`}
+                          >
+                            {map.name}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-semibold transition-colors ${
+                              isExcluded ? 'text-red-400 uppercase' : 'text-[#71717a] group-hover:text-[#d4d4d8]'
+                            }`}
+                          >
+                            {isExcluded ? 'Исключена' : 'В пуле'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* Mode 2: Preselected Maps */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-[#a1a1aa]">
+                    <span>
+                      {format === 'BO1'
+                        ? 'Выберите 1 карту для матча:'
+                        : `Выберите ${requiredPresetMapsCount} карт по порядку проведения:`}
+                    </span>
+                    {presetMaps.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPresetMaps([]);
+                          setError(null);
+                        }}
+                        className="text-xs text-[#a1a1aa] hover:text-white px-2 py-0.5 rounded bg-[#161616] border border-[#2e2e2e] hover:border-[#444444] transition-all font-medium"
                       >
-                        {map.name}
-                      </span>
+                        Сбросить выбор
+                      </button>
+                    )}
+                  </div>
 
-                      {/* Status indicator badge */}
-                      <span
-                        className={`text-[10px] font-mono font-semibold transition-colors ${
-                          isExcluded ? 'text-red-400 uppercase' : 'text-[#71717a] group-hover:text-[#d4d4d8]'
-                        }`}
-                      >
-                        {isExcluded ? 'Исключена' : 'В пуле'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
+                    {CS2_MAPS.map((map) => {
+                      const selectedIdx = presetMaps.indexOf(map.id);
+                      const isSelected = selectedIdx !== -1;
+                      const isMaxReached = presetMaps.length >= requiredPresetMapsCount && !isSelected;
+
+                      return (
+                        <button
+                          key={map.id}
+                          type="button"
+                          onClick={() => togglePresetMap(map.id)}
+                          className={`group relative flex flex-col items-center p-2 rounded-xl border transition-all duration-200 select-none ${
+                            isSelected
+                              ? 'bg-emerald-950/30 border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-1 ring-emerald-400/40'
+                              : isMaxReached
+                              ? 'bg-[#121212] border border-[#222222] opacity-40 cursor-not-allowed'
+                              : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
+                          }`}
+                        >
+                          <div
+                            className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                              isSelected ? 'border-emerald-400/50' : 'border-white/10 group-hover:border-white/25'
+                            }`}
+                          >
+                            <img
+                              src={map.image}
+                              alt={map.name}
+                              className={`w-full h-full object-cover transition-all duration-200 ${
+                                isSelected ? 'scale-105' : 'group-hover:scale-105'
+                              }`}
+                            />
+                            {isSelected && (
+                              <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                <Check className="w-5 h-5 text-emerald-400 stroke-[3]" />
+                                <span className="text-[9px] font-mono font-black text-emerald-300 uppercase tracking-wider">
+                                  {format === 'BO1'
+                                    ? 'ВЫБРАНА'
+                                    : selectedIdx === requiredPresetMapsCount - 1
+                                    ? `№${selectedIdx + 1} DECIDER`
+                                    : `КАРТА №${selectedIdx + 1}`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <span
+                            className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
+                              isSelected ? 'text-emerald-300' : 'text-white group-hover:text-white'
+                            }`}
+                          >
+                            {map.name}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-semibold transition-colors ${
+                              isSelected ? 'text-emerald-400 font-black uppercase' : 'text-[#71717a]'
+                            }`}
+                          >
+                            {isSelected
+                              ? format === 'BO1'
+                                ? 'Основная'
+                                : `#${selectedIdx + 1}`
+                              : 'Выбрать'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Comment */}

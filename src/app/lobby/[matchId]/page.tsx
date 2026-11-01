@@ -20,7 +20,7 @@ import Link from 'next/link';
 
 interface MatchLobbyData {
   id: string;
-  format: 'BO1' | 'BO2' | 'BO3';
+  format: 'BO1' | 'BO2' | 'BO3' | 'BO5';
   platform?: string;
   status: string;
   scheduledAt: string;
