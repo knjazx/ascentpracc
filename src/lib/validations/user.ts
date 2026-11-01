@@ -33,14 +33,31 @@ export const discordTagSchema = z
   .optional()
   .nullable();
 
+export const discordIdSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) => {
+      if (!val || val.length === 0) return true;
+      return /^\d{17,20}$/.test(val);
+    },
+    {
+      message: 'Discord ID должен состоять из 17-20 цифр',
+    }
+  )
+  .optional()
+  .nullable();
+
 export const onboardingSchema = z.object({
   timezone: timezoneSchema,
   discordTag: discordTagSchema,
+  discordId: discordIdSchema,
 });
 
 export const updateProfileSchema = z.object({
   timezone: timezoneSchema.optional(),
   discordTag: discordTagSchema,
+  discordId: discordIdSchema,
 });
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;

@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { scrimResponseSchema } from '@/lib/validations/scrim';
 import { ScrimStatus, ResponseStatus } from '@prisma/client';
+import { notifyScrimResponseInDM } from '@/lib/discord';
 
 export async function POST(
   request: NextRequest,
@@ -45,7 +46,19 @@ export async function POST(
       include: {
         team: {
           include: {
-            managers: true,
+            managers: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    discordId: true,
+                    discordTag: true,
+                    timezone: true,
+                  },
+                },
+              },
+            },
           },
         },
         slots: true,
@@ -153,6 +166,50 @@ export async function POST(
 
       return resp;
     });
+
+    // Asynchronously notify managers in Discord DMs via ASCENT HELPER
+    (async () => {
+      try {
+        let slotTimeText = 'По договоренности';
+        if (slotId) {
+          const chosenSlot = scrim.slots.find((s) => s.id === slotId);
+          if (chosenSlot) {
+            slotTimeText = new Date(chosenSlot.startsAt).toLocaleString('ru-RU', {
+              day: 'numeric',
+              month: 'long',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          }
+        } else if (proposedAt) {
+          slotTimeText = `Предложено: ${proposedAt.toLocaleString('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`;
+        }
+
+        for (const m of scrim.team.managers) {
+          const discordTarget = m.user.discordId || m.user.discordTag;
+          if (discordTarget) {
+            await notifyScrimResponseInDM({
+              recipientDiscordIdOrTag: discordTarget,
+              targetTeamName: scrim.team.name,
+              respondingTeamName: managerRecord?.team.name || 'Соперник',
+              respondingTeamTag: managerRecord?.team.tag || 'CS2',
+              slotTimeText,
+              message: validated.message || null,
+              disableVertigo: Boolean(validated.disableVertigo),
+              scrimId: requestId,
+              platform: scrim.platform || undefined,
+            });
+          }
+        }
+      } catch (dmErr) {
+        console.error('[Discord Bot DM Error]', dmErr);
+      }
+    })();
 
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (err: unknown) {

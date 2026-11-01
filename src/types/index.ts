@@ -40,6 +40,7 @@ export interface SafeUser {
   avatarUrl: string;
   timezone: string;
   discordTag: string | null;
+  discordId: string | null;
   role: Role;
   banned: boolean;
   onboarded: boolean;

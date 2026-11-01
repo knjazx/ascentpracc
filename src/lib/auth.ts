@@ -53,6 +53,7 @@ export function toSafeUser(user: User): SafeUser {
     avatarUrl: user.avatarUrl,
     timezone: user.timezone,
     discordTag: user.discordTag,
+    discordId: user.discordId,
     role: user.role,
     banned: user.banned,
     onboarded: user.onboarded,

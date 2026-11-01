@@ -103,13 +103,17 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const validated = updateProfileSchema.parse(body);
 
-    const updateData: { timezone?: string; discordTag?: string | null; onboarded?: boolean } = {};
+    const updateData: { timezone?: string; discordTag?: string | null; discordId?: string | null; onboarded?: boolean } = {};
 
     updateData.timezone = validated.timezone || 'SYSTEM';
     updateData.onboarded = true;
 
     if (validated.discordTag !== undefined) {
       updateData.discordTag = validated.discordTag ? validated.discordTag.trim() : null;
+    }
+
+    if (validated.discordId !== undefined) {
+      updateData.discordId = validated.discordId ? validated.discordId.trim() : null;
     }
 
     const updatedUser = await prisma.user.update({

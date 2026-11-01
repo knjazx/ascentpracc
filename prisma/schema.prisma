@@ -88,6 +88,7 @@ model User {
   avatarUrl   String
   timezone    String   @default("Europe/Kyiv")
   discordTag  String?
+  discordId   String?
   role        Role     @default(USER)
   banned      Boolean  @default(false)
   onboarded   Boolean  @default(false)
