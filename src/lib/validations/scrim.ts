@@ -37,7 +37,10 @@ export const scrimCreateSchema = z.object({
     .default('CYBERSHOCK'),
   excludedMaps: z
     .array(z.string())
-    .max(3, 'Нельзя исключить более 3 карт (в пуле должно оставаться минимум 5 карт)')
+    .refine(
+      (maps) => maps.filter((m) => m !== 'de_vertigo').length <= 3,
+      { message: 'Нельзя исключить более 3 карт из соревновательного пула Active Duty' }
+    )
     .default([]),
   presetMaps: z
     .array(z.string())
@@ -82,6 +85,7 @@ export const scrimResponseSchema = z
       .max(500, 'Сообщение не должно превышать 500 символов')
       .optional()
       .nullable(),
+    disableVertigo: z.boolean().optional().default(false),
   })
   .refine((data) => data.slotId || data.proposedAt, {
     message: 'Необходимо выбрать один из предложенных слотов или указать свое время',

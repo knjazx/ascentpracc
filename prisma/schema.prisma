@@ -188,15 +188,16 @@ model ScrimSlot {
 }
 
 model ScrimResponse {
-  id         String         @id @default(cuid())
-  requestId  String
-  teamId     String
-  slotId     String?
-  proposedAt DateTime?
-  message    String?
-  status     ResponseStatus @default(PENDING)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  requestId      String
+  teamId         String
+  slotId         String?
+  proposedAt     DateTime?
+  message        String?
+  disableVertigo Boolean        @default(false)
+  status         ResponseStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   request ScrimRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   team    Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)

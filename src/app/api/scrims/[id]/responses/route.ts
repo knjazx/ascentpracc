@@ -127,6 +127,7 @@ export async function POST(
           slotId,
           proposedAt,
           message: validated.message || null,
+          disableVertigo: Boolean(validated.disableVertigo),
           status: ResponseStatus.PENDING,
         },
         include: {

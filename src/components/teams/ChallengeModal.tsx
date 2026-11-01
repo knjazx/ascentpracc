@@ -21,23 +21,15 @@ import {
   Globe,
   ListOrdered,
   Check,
+  Ban,
+  Info,
 } from 'lucide-react';
 import { SERVER_LOCATIONS } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { fromZonedTime } from 'date-fns-tz';
 import { getSystemTimezone } from '@/lib/date';
 import { TIMEZONE_OPTIONS } from '@/lib/timezones';
-
-const CS2_MAPS = [
-  { id: 'de_dust2', name: 'Dust2', image: '/maps/de_dust2.webp' },
-  { id: 'de_mirage', name: 'Mirage', image: '/maps/de_mirage.webp' },
-  { id: 'de_nuke', name: 'Nuke', image: '/maps/de_nuke.webp' },
-  { id: 'de_ancient', name: 'Ancient', image: '/maps/de_ancient.webp' },
-  { id: 'de_inferno', name: 'Inferno', image: '/maps/de_inferno.webp' },
-  { id: 'de_anubis', name: 'Anubis', image: '/maps/de_anubis.webp' },
-  { id: 'de_cache', name: 'Cache', image: '/maps/de_cache.webp' },
-  { id: 'de_vertigo', name: 'Vertigo', image: '/maps/de_vertigo.webp' },
-];
+import { ACTIVE_DUTY_MAPS, EXPANDED_POOL_MAPS, ALL_MAPS } from '@/lib/constants/maps';
 
 interface SlotItem {
   id: string;
@@ -80,6 +72,7 @@ export function ChallengeModal({
   const [platform, setPlatform] = useState<'CYBERSHOCK' | 'XPLAY' | 'FASTCUP' | 'OTHER'>('CYBERSHOCK');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [mapSelectionMode, setMapSelectionMode] = useState<'VETO' | 'PRESET'>('VETO');
+  const [excludedMaps, setExcludedMaps] = useState<string[]>([]);
   const [presetMaps, setPresetMaps] = useState<string[]>([]);
   const [selectedTimezone, setSelectedTimezone] = useState<string>(() => getSystemTimezone());
   const [isServerDropdownOpen, setIsServerDropdownOpen] = useState(false);
@@ -180,6 +173,27 @@ export function ChallengeModal({
     }
   };
 
+  const toggleMapExcluded = (mapId: string) => {
+    if (excludedMaps.includes(mapId)) {
+      setExcludedMaps(excludedMaps.filter((m) => m !== mapId));
+      setError(null);
+    } else {
+      if (mapId === 'de_vertigo') {
+        // Vertigo is in expanded pool and can be excluded freely
+        setError(null);
+        setExcludedMaps([...excludedMaps, mapId]);
+        return;
+      }
+      const activeDutyExcluded = excludedMaps.filter((m) => m !== 'de_vertigo');
+      if (activeDutyExcluded.length >= 3) {
+        setError('Нельзя исключить более 3 карт из соревновательного пула Active Duty');
+        return;
+      }
+      setError(null);
+      setExcludedMaps([...excludedMaps, mapId]);
+    }
+  };
+
   const togglePresetMap = (mapId: string) => {
     if (presetMaps.includes(mapId)) {
       setPresetMaps(presetMaps.filter((m) => m !== mapId));
@@ -254,6 +268,7 @@ export function ChallengeModal({
           platform,
           serverLocations: selectedLocations,
           presetMaps: mapSelectionMode === 'PRESET' ? presetMaps : [],
+          excludedMaps: mapSelectionMode === 'VETO' ? excludedMaps : [],
           slots: formattedSlots,
           comment: comment.trim(),
         }),
@@ -558,7 +573,92 @@ export function ChallengeModal({
                   </div>
                 </div>
 
-                {mapSelectionMode === 'PRESET' && (
+                {mapSelectionMode === 'VETO' ? (
+                  <div className="space-y-3 pt-1 border-t border-[#1a1a1a]">
+                    <div className="flex items-center justify-between text-[11px] text-[#a1a1aa]">
+                      <span>
+                        Active Duty ({excludedMaps.filter((m) => m !== 'de_vertigo').length}/3 исключено):
+                      </span>
+                      {excludedMaps.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setExcludedMaps([])}
+                          className="text-[10px] text-white hover:underline font-mono"
+                        >
+                          Сбросить
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Active Duty maps */}
+                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                      {ACTIVE_DUTY_MAPS.map((map) => {
+                        const isExcluded = excludedMaps.includes(map.id);
+                        return (
+                          <div
+                            key={map.id}
+                            onClick={() => toggleMapExcluded(map.id)}
+                            className={`p-1.5 rounded-lg border text-center transition-all select-none cursor-pointer ${
+                              isExcluded
+                                ? 'bg-red-950/40 border-red-500 text-red-300 font-bold'
+                                : 'bg-[#141414] border-[#222222] text-[#a1a1aa] hover:border-[#383838]'
+                            }`}
+                          >
+                            <div className="relative aspect-[3/2] rounded overflow-hidden mb-1">
+                              <img
+                                src={map.image}
+                                alt={map.name}
+                                className={`w-full h-full object-cover ${isExcluded ? 'grayscale opacity-40' : ''}`}
+                              />
+                              {isExcluded && (
+                                <div className="absolute inset-0 bg-red-950/70 flex items-center justify-center">
+                                  <Ban className="w-3.5 h-3.5 text-red-500" />
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[10px] block truncate">{map.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Expanded Pool (Vertigo) */}
+                    <div className="p-2 rounded-lg border border-purple-500/30 bg-purple-950/15 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src="/maps/de_vertigo.webp"
+                          alt="Vertigo"
+                          className="w-10 h-7 rounded object-cover border border-purple-500/30 shrink-0"
+                        />
+                        <div className="leading-tight">
+                          <span className="text-xs font-bold text-white flex items-center gap-1 font-mono">
+                            <span>Vertigo (Расширенный пул)</span>
+                            <span title="Можно отключить просто так без траты 3 банов">
+                              <Info className="w-3 h-3 text-purple-400" />
+                            </span>
+                          </span>
+                          <span className="text-[10px] text-[#a1a1aa]">
+                            {excludedMaps.includes('de_vertigo')
+                              ? 'Vertigo отключена для вызова'
+                              : 'В пуле. Можно отключить бесплатно.'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleMapExcluded('de_vertigo')}
+                        className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold transition-all shrink-0 ${
+                          excludedMaps.includes('de_vertigo')
+                            ? 'bg-red-500/25 border border-red-500/50 text-red-400'
+                            : 'bg-[#1a1a1a] border border-purple-500/40 text-purple-300 hover:text-white'
+                        }`}
+                      >
+                        {excludedMaps.includes('de_vertigo') ? 'Отключена' : 'Отключить'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                   <div className="space-y-2 pt-1 border-t border-[#1a1a1a]">
                     <div className="flex items-center justify-between text-[11px] text-[#a1a1aa]">
                       <span>
@@ -575,7 +675,7 @@ export function ChallengeModal({
                       )}
                     </div>
                     <div className="grid grid-cols-4 gap-1.5">
-                      {CS2_MAPS.map((map) => {
+                      {ALL_MAPS.map((map) => {
                         const selectedIdx = presetMaps.indexOf(map.id);
                         const isSelected = selectedIdx !== -1;
                         const isMaxReached = presetMaps.length >= requiredPresetMapsCount && !isSelected;

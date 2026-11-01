@@ -31,7 +31,10 @@ import {
   X,
   Minus,
   AlertTriangle,
+  Info,
+  Layers,
 } from 'lucide-react';
+import { ACTIVE_DUTY_MAPS, EXPANDED_POOL_MAPS } from '@/lib/constants/maps';
 
 function TeamProfileLogo({
   logoUrl,
@@ -546,6 +549,144 @@ export default function TeamProfilePage() {
                   )}
                 </div>
               ))}
+            </div>
+          </Card>
+
+          {/* Map Pool & Stats */}
+          <Card className="md:col-span-3 border border-[#222222] bg-[#111111] shadow-xl p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#222222] pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-white" />
+                  <span>Пул карт команды</span>
+                </h2>
+                <p className="text-xs text-[#a1a1aa]">
+                  Соревновательный пул и статистика выступлений
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 pt-1">
+              {/* Active Duty Maps (7 maps) */}
+              <div className="lg:col-span-3 space-y-3 p-4 rounded-xl border border-[#222222] bg-[#0a0a0a]">
+                <div className="flex items-center justify-between pb-2 border-b border-[#1e1e1e]">
+                  <span className="text-xs font-mono font-black uppercase tracking-wider text-white">
+                    СПИСОК КАРТ ACTIVE DUTY
+                  </span>
+                  <span className="text-[10px] font-mono text-[#a1a1aa]">
+                    7 соревновательных карт
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+                  {ACTIVE_DUTY_MAPS.map((map) => {
+                    const stat = team.stats?.mapStats?.[map.id];
+                    const played = stat?.played || 0;
+                    const wr = played > 0 ? Math.round(stat!.winRate * 100) : null;
+
+                    return (
+                      <div
+                        key={map.id}
+                        className="flex flex-col items-center p-2 rounded-xl border border-[#222222] bg-[#141414] hover:border-[#383838] transition-colors"
+                      >
+                        <div className="relative w-full aspect-[3/2] overflow-hidden rounded-lg border border-white/10">
+                          <img
+                            src={map.image}
+                            alt={map.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                        <span className="mt-2 text-xs font-bold text-white tracking-wide truncate max-w-full">
+                          {map.name}
+                        </span>
+                        <div className="mt-1 flex flex-col items-center text-center">
+                          <span
+                            className={`text-xs font-mono font-black ${
+                              wr !== null
+                                ? wr >= 60
+                                  ? 'text-emerald-400'
+                                  : wr >= 40
+                                  ? 'text-white'
+                                  : 'text-rose-400'
+                                : 'text-[#71717a]'
+                            }`}
+                          >
+                            {wr !== null ? `${wr}% WR` : '—'}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#71717a]">
+                            {played > 0 ? `${played} ${played === 1 ? 'матч' : played < 5 ? 'матча' : 'матчей'}` : '0 матчей'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Expanded Pool (Vertigo) */}
+              <div className="lg:col-span-1 space-y-3 p-4 rounded-xl border border-purple-500/30 bg-purple-950/10 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
+                    <span className="text-xs font-mono font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                      <span>РАСШИРЕННЫЙ ПУЛ</span>
+                      <span title="Карта из расширенного пула. Любая команда может отключить её бесплатно без траты 3 банов Active Duty.">
+                        <Info className="w-3.5 h-3.5 text-purple-400 cursor-help" />
+                      </span>
+                    </span>
+                  </div>
+
+                  {EXPANDED_POOL_MAPS.map((map) => {
+                    const stat = team.stats?.mapStats?.[map.id];
+                    const played = stat?.played || 0;
+                    const wr = played > 0 ? Math.round(stat!.winRate * 100) : null;
+
+                    return (
+                      <div key={map.id} className="pt-2 space-y-2">
+                        <div className="flex flex-col items-center p-2 rounded-xl border border-purple-500/40 bg-[#141414]">
+                          <div className="relative w-full aspect-[3/2] overflow-hidden rounded-lg border border-purple-500/30">
+                            <img
+                              src={map.image}
+                              alt={map.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+                          <span className="mt-2 text-xs font-bold text-white tracking-wide">
+                            {map.name}
+                          </span>
+                          <div className="mt-1 flex flex-col items-center text-center">
+                            <span
+                              className={`text-xs font-mono font-black ${
+                                wr !== null
+                                  ? wr >= 60
+                                    ? 'text-emerald-400'
+                                    : wr >= 40
+                                    ? 'text-white'
+                                    : 'text-rose-400'
+                                  : 'text-purple-300'
+                              }`}
+                            >
+                              {wr !== null ? `${wr}% WR` : 'Опционально'}
+                            </span>
+                            <span className="text-[10px] font-mono text-[#a1a1aa]">
+                              {played > 0 ? `${played} игр` : '0 матчей'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[10px] text-purple-200 leading-snug">
+                  💡 Vertigo входит в расширенный пул — любая команда может отключить её перед матчем бесплатно.
+                </div>
+              </div>
             </div>
           </Card>
         </div>

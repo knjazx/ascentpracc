@@ -30,19 +30,10 @@ import {
   Gamepad2,
   Quote,
   MapPin,
+  Info,
 } from 'lucide-react';
 import { FaceitBadge } from '@/components/ui/FaceitBadge';
-
-const ALL_POOL_MAPS = [
-  { id: 'de_dust2', name: 'Dust2', image: '/maps/de_dust2.webp' },
-  { id: 'de_mirage', name: 'Mirage', image: '/maps/de_mirage.webp' },
-  { id: 'de_nuke', name: 'Nuke', image: '/maps/de_nuke.webp' },
-  { id: 'de_ancient', name: 'Ancient', image: '/maps/de_ancient.webp' },
-  { id: 'de_inferno', name: 'Inferno', image: '/maps/de_inferno.webp' },
-  { id: 'de_anubis', name: 'Anubis', image: '/maps/de_anubis.webp' },
-  { id: 'de_cache', name: 'Cache', image: '/maps/de_cache.webp' },
-  { id: 'de_vertigo', name: 'Vertigo', image: '/maps/de_vertigo.webp' },
-];
+import { ACTIVE_DUTY_MAPS, EXPANDED_POOL_MAPS, ALL_MAPS } from '@/lib/constants/maps';
 import { SERVER_LOCATION_MAP } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { getClientCache, setClientCache, clearClientCache } from '@/lib/client-cache';
@@ -93,6 +84,7 @@ interface ScrimDetail {
     slotId: string | null;
     proposedAt: string | null;
     message: string | null;
+    disableVertigo?: boolean;
     status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN';
     createdAt: string;
     team: {
@@ -131,6 +123,7 @@ export default function ScrimDetailPage() {
   const [responseMessage, setResponseMessage] = useState('');
   const [submittingResponse, setSubmittingResponse] = useState(false);
   const [responseSent, setResponseSent] = useState(false);
+  const [disableVertigo, setDisableVertigo] = useState(false);
 
   // Action states
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -190,6 +183,7 @@ export default function ScrimDetailPage() {
           slotId: proposeCustomTime ? null : selectedSlotId,
           proposedAt,
           message: responseMessage.trim() || null,
+          disableVertigo,
         }),
       });
 
@@ -684,7 +678,7 @@ export default function ScrimDetailPage() {
                   <span className="text-emerald-400 font-bold">Вето не требуется</span>
                 ) : (
                   <>
-                    <span className="text-white font-bold">{ALL_POOL_MAPS.length - scrim.excludedMaps.length} в пуле</span>
+                    <span className="text-white font-bold">{ALL_MAPS.length - scrim.excludedMaps.length} в пуле</span>
                     {scrim.excludedMaps.length > 0 && (
                       <>
                         <span>•</span>
@@ -699,10 +693,11 @@ export default function ScrimDetailPage() {
             {scrim.presetMaps && scrim.presetMaps.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
                 {scrim.presetMaps.map((mapId, index) => {
-                  const mapInfo = ALL_POOL_MAPS.find((m) => m.id === mapId) || {
+                  const mapInfo = ALL_MAPS.find((m) => m.id === mapId) || {
                     id: mapId,
                     name: mapId.replace('de_', '').toUpperCase(),
                     image: `/maps/${mapId}.webp`,
+                    pool: 'ACTIVE_DUTY' as const,
                   };
                   const isDecider = index === scrim.presetMaps!.length - 1 && scrim.presetMaps!.length > 1;
 
@@ -742,64 +737,148 @@ export default function ScrimDetailPage() {
                 })}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
-                {ALL_POOL_MAPS.map((map) => {
-                  const isExcluded = scrim.excludedMaps.includes(map.id);
-                  return (
-                    <div
-                      key={map.id}
-                      className={`relative flex flex-col items-center p-2 rounded-xl border transition-all select-none ${
-                        isExcluded
-                          ? 'bg-red-950/25 border-2 border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
-                          : 'bg-[#181818] border border-[#333333]'
-                      }`}
-                    >
-                      {/* Map Thumbnail */}
-                      <div
-                        className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border ${
-                          isExcluded ? 'border-red-500/40' : 'border-white/10'
-                        }`}
-                      >
-                        <img
-                          src={map.image}
-                          alt={map.name}
-                          className={`w-full h-full object-cover ${
-                            isExcluded ? 'grayscale opacity-40 scale-95' : ''
+              /* Dual Pool Display matching screenshot */
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 pt-1">
+                {/* Active Duty Maps (7 maps) */}
+                <div className="lg:col-span-3 space-y-2 p-3 rounded-xl border border-[#222222] bg-[#0a0a0a]">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-[#1a1a1a]">
+                    <span className="text-[11px] font-mono font-black uppercase tracking-wider text-white">
+                      Список карт Active Duty
+                    </span>
+                    <span className="text-[10px] font-mono text-[#a1a1aa]">
+                      {scrim.excludedMaps.filter((m) => m !== 'de_vertigo').length > 0
+                        ? `${scrim.excludedMaps.filter((m) => m !== 'de_vertigo').length} забанено`
+                        : 'Все в пуле'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-1">
+                    {ACTIVE_DUTY_MAPS.map((map) => {
+                      const isExcluded = scrim.excludedMaps.includes(map.id);
+                      return (
+                        <div
+                          key={map.id}
+                          className={`relative flex flex-col items-center p-1.5 rounded-xl border transition-all select-none ${
+                            isExcluded
+                              ? 'bg-red-950/25 border-2 border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
+                              : 'bg-[#181818] border border-[#333333]'
                           }`}
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                        {isExcluded && (
-                          <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
-                            <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
-                            <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
-                              БАН
-                            </span>
+                        >
+                          <div
+                            className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border ${
+                              isExcluded ? 'border-red-500/40' : 'border-white/10'
+                            }`}
+                          >
+                            <img
+                              src={map.image}
+                              alt={map.name}
+                              className={`w-full h-full object-cover ${
+                                isExcluded ? 'grayscale opacity-40 scale-95' : ''
+                              }`}
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                            {isExcluded && (
+                              <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                <Ban className="w-4 h-4 text-red-500 stroke-[2.5]" />
+                                <span className="text-[8px] font-mono font-black text-red-300 uppercase tracking-wider">
+                                  БАН
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
+
+                          <span
+                            className={`mt-1.5 pb-0.5 text-[11px] font-bold tracking-wide transition-colors ${
+                              isExcluded ? 'text-red-400 line-through' : 'text-white'
+                            }`}
+                          >
+                            {map.name}
+                          </span>
+
+                          <span
+                            className={`text-[9px] font-mono font-semibold ${
+                              isExcluded ? 'text-red-400 uppercase' : 'text-[#888888]'
+                            }`}
+                          >
+                            {isExcluded ? 'Забанена' : 'В пуле'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Expanded Pool: Vertigo (1 map) */}
+                <div className="lg:col-span-1 space-y-2 p-3 rounded-xl border border-purple-500/30 bg-purple-950/10">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-purple-500/20">
+                    <span className="text-[11px] font-mono font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
+                      <span>Расширенный пул</span>
+                      <span title="Карта расширенного пула. Может быть отключена любой стороной">
+                        <Info className="w-3.5 h-3.5 text-purple-400" />
+                      </span>
+                    </span>
+                    <span className="text-[9px] font-mono text-purple-300 font-bold">
+                      {scrim.excludedMaps.includes('de_vertigo') ? 'Отключена' : 'В пуле'}
+                    </span>
+                  </div>
+
+                  {EXPANDED_POOL_MAPS.map((map) => {
+                    const isExcluded = scrim.excludedMaps.includes(map.id);
+                    return (
+                      <div
+                        key={map.id}
+                        className={`relative flex flex-col items-center p-2 rounded-xl border transition-all select-none ${
+                          isExcluded
+                            ? 'bg-red-950/25 border-2 border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
+                            : 'bg-[#181818] border border-purple-500/40'
+                        }`}
+                      >
+                        <div
+                          className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border ${
+                            isExcluded ? 'border-red-500/40' : 'border-purple-500/30'
+                          }`}
+                        >
+                          <img
+                            src={map.image}
+                            alt={map.name}
+                            className={`w-full h-full object-cover ${
+                              isExcluded ? 'grayscale opacity-40 scale-95' : ''
+                            }`}
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                          {isExcluded && (
+                            <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                              <Ban className="w-4 h-4 text-red-500 stroke-[2.5]" />
+                              <span className="text-[8px] font-mono font-black text-red-300 uppercase tracking-wider">
+                                ОТКЛЮЧЕНА
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <span
+                          className={`mt-1.5 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
+                            isExcluded ? 'text-red-400 line-through' : 'text-white'
+                          }`}
+                        >
+                          {map.name}
+                        </span>
+
+                        <span
+                          className={`text-[10px] font-mono font-semibold ${
+                            isExcluded ? 'text-red-400 uppercase' : 'text-purple-300'
+                          }`}
+                        >
+                          {isExcluded ? 'Отключена' : 'В пуле'}
+                        </span>
                       </div>
-
-                      {/* Map Name */}
-                      <span
-                        className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
-                          isExcluded ? 'text-red-400 line-through' : 'text-white'
-                        }`}
-                      >
-                        {map.name}
-                      </span>
-
-                      {/* Status Badge */}
-                      <span
-                        className={`text-[10px] font-mono font-semibold ${
-                          isExcluded ? 'text-red-400 uppercase' : 'text-[#888888]'
-                        }`}
-                      >
-                        {isExcluded ? 'Забанена' : 'В пуле'}
-                      </span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -963,9 +1042,16 @@ export default function ScrimDetailPage() {
                         </div>
 
                         {/* Row 2: Selected Slot Time */}
-                        <div className="flex items-center gap-2 text-xs font-mono text-[#d4d4d8]">
-                          <Clock className="w-3.5 h-3.5 text-white/60 shrink-0" />
-                          <span className="font-semibold text-white/90">{slotInfo}</span>
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#d4d4d8]">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-3.5 h-3.5 text-white/60 shrink-0" />
+                            <span className="font-semibold text-white/90">{slotInfo}</span>
+                          </div>
+                          {resp.disableVertigo && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30">
+                              🚫 Отключили Vertigo
+                            </span>
+                          )}
                         </div>
 
                         {/* Row 3: Message / Note */}
@@ -1177,10 +1263,17 @@ export default function ScrimDetailPage() {
                               [{resp.team.tag}]
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{slotTimeDisplay}</span>
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-amber-400" />
+                              <span>{slotTimeDisplay}</span>
+                            </p>
+                            {resp.disableVertigo && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30">
+                                🚫 Отключили Vertigo
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {resp.status === 'PENDING' && (
@@ -1318,6 +1411,34 @@ export default function ScrimDetailPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Vertigo disable toggle (Expanded pool) if host didn't exclude Vertigo */}
+                  {!scrim.excludedMaps.includes('de_vertigo') && (
+                    <div className="p-3 rounded-xl bg-[#141414] border border-[#2a2a2a] flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white">Отключить Vertigo</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            Расширенный пул
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#a1a1aa]">
+                          Карта из расширенного пула. Вы можете исключить её из матча бесплатно.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDisableVertigo(!disableVertigo)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all shrink-0 ${
+                          disableVertigo
+                            ? 'bg-rose-500 text-white shadow-sm'
+                            : 'bg-[#1e1e1e] text-[#a1a1aa] hover:text-white border border-[#333]'
+                        }`}
+                      >
+                        {disableVertigo ? '✕ Исключена' : '+ Исключить'}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Optional Message */}
                   <div className="space-y-1.5">

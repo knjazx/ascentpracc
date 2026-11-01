@@ -26,6 +26,7 @@ import {
   ChevronDown,
   X,
   ListOrdered,
+  Info,
 } from 'lucide-react';
 import { SERVER_LOCATIONS } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
@@ -33,23 +34,13 @@ import { clearClientCache } from '@/lib/client-cache';
 import { fromZonedTime } from 'date-fns-tz';
 import { getSystemTimezone } from '@/lib/date';
 import { TIMEZONE_OPTIONS } from '@/lib/timezones';
+import { ACTIVE_DUTY_MAPS, EXPANDED_POOL_MAPS, ALL_MAPS } from '@/lib/constants/maps';
 
 const PLATFORMS: Array<{ id: 'CYBERSHOCK' | 'XPLAY' | 'FASTCUP' | 'OTHER'; name: string }> = [
   { id: 'CYBERSHOCK', name: 'Cybershoke' },
   { id: 'XPLAY', name: 'Xplay' },
   { id: 'FASTCUP', name: 'Fastcup' },
   { id: 'OTHER', name: 'Другой' },
-];
-
-const CS2_MAPS = [
-  { id: 'de_dust2', name: 'Dust2', image: '/maps/de_dust2.webp' },
-  { id: 'de_mirage', name: 'Mirage', image: '/maps/de_mirage.webp' },
-  { id: 'de_nuke', name: 'Nuke', image: '/maps/de_nuke.webp' },
-  { id: 'de_ancient', name: 'Ancient', image: '/maps/de_ancient.webp' },
-  { id: 'de_inferno', name: 'Inferno', image: '/maps/de_inferno.webp' },
-  { id: 'de_anubis', name: 'Anubis', image: '/maps/de_anubis.webp' },
-  { id: 'de_cache', name: 'Cache', image: '/maps/de_cache.webp' },
-  { id: 'de_vertigo', name: 'Vertigo', image: '/maps/de_vertigo.webp' },
 ];
 
 interface SlotItem {
@@ -161,9 +152,17 @@ function CreateScrimForm() {
   const toggleMapExcluded = (mapId: string) => {
     if (excludedMaps.includes(mapId)) {
       setExcludedMaps(excludedMaps.filter((m) => m !== mapId));
+      setError(null);
     } else {
-      if (excludedMaps.length >= 3) {
-        setError('Нельзя исключить более 3 карт');
+      if (mapId === 'de_vertigo') {
+        // Vertigo is in expanded pool and can be excluded by anyone freely without consuming the 3-ban limit!
+        setError(null);
+        setExcludedMaps([...excludedMaps, mapId]);
+        return;
+      }
+      const activeDutyExcluded = excludedMaps.filter((m) => m !== 'de_vertigo');
+      if (activeDutyExcluded.length >= 3) {
+        setError('Нельзя исключить более 3 карт из соревновательного пула Active Duty');
         return;
       }
       setError(null);
@@ -824,9 +823,9 @@ function CreateScrimForm() {
 
               {mapSelectionMode === 'VETO' ? (
                 /* Mode 1: Veto in Lobby (with optional bans) */
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between text-xs text-[#a1a1aa]">
-                    <span>Нажмите на карту, чтобы исключить её из вето (максимум 3)</span>
+                    <span>Нажмите на карту, чтобы исключить её из вето</span>
                     {excludedMaps.length > 0 && (
                       <button
                         type="button"
@@ -838,63 +837,152 @@ function CreateScrimForm() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
-                    {CS2_MAPS.map((map) => {
-                      const isExcluded = excludedMaps.includes(map.id);
-                      return (
-                        <button
-                          key={map.id}
-                          type="button"
-                          onClick={() => toggleMapExcluded(map.id)}
-                          className={`group relative flex flex-col items-center p-2 rounded-xl border transition-all duration-200 select-none ${
-                            isExcluded
-                              ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.25)] ring-1 ring-red-500/30'
-                              : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
-                          }`}
-                        >
-                          <div
-                            className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
-                              isExcluded ? 'border-red-500/40' : 'border-white/10 group-hover:border-white/25'
-                            }`}
-                          >
-                            <img
-                              src={map.image}
-                              alt={map.name}
-                              className={`w-full h-full object-cover transition-all duration-200 ${
-                                isExcluded ? 'grayscale opacity-40 scale-95' : 'group-hover:scale-105'
+                  {/* Dual Pool Layout: Active Duty (Left 7 maps) + Expanded Pool (Right Vertigo) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    {/* Active Duty Maps (7 maps) */}
+                    <div className="lg:col-span-3 space-y-2 p-3 rounded-xl border border-[#222222] bg-[#0f0f0f]">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-[#1e1e1e]">
+                        <span className="text-[11px] font-mono font-black uppercase tracking-wider text-white">
+                          Список карт Active Duty
+                        </span>
+                        <span className="text-[10px] font-mono text-[#a1a1aa]">
+                          {excludedMaps.filter((m) => m !== 'de_vertigo').length}/3 исключено
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-1">
+                        {ACTIVE_DUTY_MAPS.map((map) => {
+                          const isExcluded = excludedMaps.includes(map.id);
+                          return (
+                            <button
+                              key={map.id}
+                              type="button"
+                              onClick={() => toggleMapExcluded(map.id)}
+                              className={`group relative flex flex-col items-center p-1.5 rounded-xl border transition-all duration-200 select-none ${
+                                isExcluded
+                                  ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)] ring-1 ring-red-500/30'
+                                  : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
                               }`}
-                            />
-                            {isExcluded && (
-                              <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
-                                <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
-                                <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
-                                  БАН
-                                </span>
+                            >
+                              <div
+                                className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                                  isExcluded ? 'border-red-500/40' : 'border-white/10 group-hover:border-white/25'
+                                }`}
+                              >
+                                <img
+                                  src={map.image}
+                                  alt={map.name}
+                                  className={`w-full h-full object-cover transition-all duration-200 ${
+                                    isExcluded ? 'grayscale opacity-40 scale-95' : 'group-hover:scale-105'
+                                  }`}
+                                />
+                                {isExcluded && (
+                                  <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                    <Ban className="w-4 h-4 text-red-500 stroke-[2.5]" />
+                                    <span className="text-[8px] font-mono font-black text-red-300 uppercase tracking-wider">
+                                      БАН
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                              <span
+                                className={`mt-1.5 pb-0.5 text-[11px] font-bold tracking-wide transition-colors ${
+                                  isExcluded ? 'text-red-400 line-through' : 'text-white group-hover:text-white'
+                                }`}
+                              >
+                                {map.name}
+                              </span>
+                              <span
+                                className={`text-[9px] font-mono font-semibold transition-colors ${
+                                  isExcluded ? 'text-red-400 uppercase' : 'text-[#71717a] group-hover:text-[#d4d4d8]'
+                                }`}
+                              >
+                                {isExcluded ? 'Исключена' : 'В пуле'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Expanded Pool: Vertigo (1 map) */}
+                    <div className="lg:col-span-1 space-y-2 p-3 rounded-xl border border-purple-500/30 bg-purple-950/10">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-purple-500/20">
+                        <span className="text-[11px] font-mono font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
+                          <span>Расширенный пул</span>
+                          <span title="Карту из расширенного пула можно отключить просто так (не тратит 3 бана Active Duty)">
+                            <Info className="w-3.5 h-3.5 text-purple-400" />
+                          </span>
+                        </span>
+                        <span className="text-[9px] font-mono text-purple-300 font-bold">
+                          {excludedMaps.includes('de_vertigo') ? 'Отключена' : 'В пуле'}
+                        </span>
+                      </div>
+
+                      {EXPANDED_POOL_MAPS.map((map) => {
+                        const isExcluded = excludedMaps.includes(map.id);
+                        return (
+                          <div key={map.id} className="space-y-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => toggleMapExcluded(map.id)}
+                              className={`w-full group relative flex flex-col items-center p-2 rounded-xl border transition-all duration-200 select-none ${
+                                isExcluded
+                                  ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)]'
+                                  : 'bg-[#181818] border border-purple-500/40 hover:border-purple-300 hover:bg-[#202020] hover:scale-[1.02]'
+                              }`}
+                            >
+                              <div
+                                className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                                  isExcluded ? 'border-red-500/40' : 'border-purple-500/30 group-hover:border-purple-300'
+                                }`}
+                              >
+                                <img
+                                  src={map.image}
+                                  alt={map.name}
+                                  className={`w-full h-full object-cover transition-all duration-200 ${
+                                    isExcluded ? 'grayscale opacity-40 scale-95' : 'group-hover:scale-105'
+                                  }`}
+                                />
+                                {isExcluded && (
+                                  <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                    <Ban className="w-5 h-5 text-red-500 stroke-[2.5]" />
+                                    <span className="text-[9px] font-mono font-black text-red-300 uppercase tracking-wider">
+                                      ОТКЛЮЧЕНА
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <span
+                                className={`mt-1.5 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
+                                  isExcluded ? 'text-red-400 line-through' : 'text-white'
+                                }`}
+                              >
+                                {map.name}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono font-semibold transition-colors ${
+                                  isExcluded ? 'text-red-400 uppercase' : 'text-purple-300'
+                                }`}
+                              >
+                                {isExcluded ? 'Отключена' : 'В пуле'}
+                              </span>
+                            </button>
+
+                            <p className="text-[10px] text-[#a1a1aa] leading-tight text-center">
+                              {isExcluded
+                                ? '✓ Vertigo отключена бесплатно (без траты 3 банов)'
+                                : 'Нажмите, чтобы отключить Vertigo без расхода банов'}
+                            </p>
                           </div>
-                          <span
-                            className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
-                              isExcluded ? 'text-red-400 line-through' : 'text-white group-hover:text-white'
-                            }`}
-                          >
-                            {map.name}
-                          </span>
-                          <span
-                            className={`text-[10px] font-mono font-semibold transition-colors ${
-                              isExcluded ? 'text-red-400 uppercase' : 'text-[#71717a] group-hover:text-[#d4d4d8]'
-                            }`}
-                          >
-                            {isExcluded ? 'Исключена' : 'В пуле'}
-                          </span>
-                        </button>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               ) : (
                 /* Mode 2: Preselected Maps */
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between text-xs text-[#a1a1aa]">
                     <span>
                       {format === 'BO1'
@@ -915,71 +1003,146 @@ function CreateScrimForm() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 pt-1">
-                    {CS2_MAPS.map((map) => {
-                      const selectedIdx = presetMaps.indexOf(map.id);
-                      const isSelected = selectedIdx !== -1;
-                      const isMaxReached = presetMaps.length >= requiredPresetMapsCount && !isSelected;
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    {/* Active Duty Maps */}
+                    <div className="lg:col-span-3 space-y-2 p-3 rounded-xl border border-[#222222] bg-[#0f0f0f]">
+                      <span className="text-[11px] font-mono font-black uppercase tracking-wider text-white block pb-1 border-b border-[#1e1e1e]">
+                        Список карт Active Duty
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-1">
+                        {ACTIVE_DUTY_MAPS.map((map) => {
+                          const selectedIdx = presetMaps.indexOf(map.id);
+                          const isSelected = selectedIdx !== -1;
+                          const isMaxReached = presetMaps.length >= requiredPresetMapsCount && !isSelected;
 
-                      return (
-                        <button
-                          key={map.id}
-                          type="button"
-                          onClick={() => togglePresetMap(map.id)}
-                          className={`group relative flex flex-col items-center p-2 rounded-xl border transition-all duration-200 select-none ${
-                            isSelected
-                              ? 'bg-emerald-950/30 border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-1 ring-emerald-400/40'
-                              : isMaxReached
-                              ? 'bg-[#121212] border border-[#222222] opacity-40 cursor-not-allowed'
-                              : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
-                          }`}
-                        >
-                          <div
-                            className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
-                              isSelected ? 'border-emerald-400/50' : 'border-white/10 group-hover:border-white/25'
-                            }`}
-                          >
-                            <img
-                              src={map.image}
-                              alt={map.name}
-                              className={`w-full h-full object-cover transition-all duration-200 ${
-                                isSelected ? 'scale-105' : 'group-hover:scale-105'
+                          return (
+                            <button
+                              key={map.id}
+                              type="button"
+                              onClick={() => togglePresetMap(map.id)}
+                              className={`group relative flex flex-col items-center p-1.5 rounded-xl border transition-all duration-200 select-none ${
+                                isSelected
+                                  ? 'bg-emerald-950/30 border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-1 ring-emerald-400/40'
+                                  : isMaxReached
+                                  ? 'bg-[#121212] border border-[#222222] opacity-40 cursor-not-allowed'
+                                  : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
                               }`}
-                            />
-                            {isSelected && (
-                              <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
-                                <Check className="w-5 h-5 text-emerald-400 stroke-[3]" />
-                                <span className="text-[9px] font-mono font-black text-emerald-300 uppercase tracking-wider">
-                                  {format === 'BO1'
-                                    ? 'ВЫБРАНА'
-                                    : selectedIdx === requiredPresetMapsCount - 1
-                                    ? `№${selectedIdx + 1} DECIDER`
-                                    : `КАРТА №${selectedIdx + 1}`}
-                                </span>
+                            >
+                              <div
+                                className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                                  isSelected ? 'border-emerald-400/50' : 'border-white/10 group-hover:border-white/25'
+                                }`}
+                              >
+                                <img
+                                  src={map.image}
+                                  alt={map.name}
+                                  className={`w-full h-full object-cover transition-all duration-200 ${
+                                    isSelected ? 'scale-105' : 'group-hover:scale-105'
+                                  }`}
+                                />
+                                {isSelected && (
+                                  <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                    <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                                    <span className="text-[8px] font-mono font-black text-emerald-300 uppercase tracking-wider">
+                                      {format === 'BO1'
+                                        ? 'ВЫБРАНА'
+                                        : selectedIdx === requiredPresetMapsCount - 1
+                                        ? `#${selectedIdx + 1} DEC`
+                                        : `#${selectedIdx + 1}`}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          <span
-                            className={`mt-2 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
-                              isSelected ? 'text-emerald-300' : 'text-white group-hover:text-white'
+                              <span
+                                className={`mt-1.5 pb-0.5 text-[11px] font-bold tracking-wide transition-colors ${
+                                  isSelected ? 'text-emerald-300' : 'text-white group-hover:text-white'
+                                }`}
+                              >
+                                {map.name}
+                              </span>
+                              <span
+                                className={`text-[9px] font-mono font-semibold transition-colors ${
+                                  isSelected ? 'text-emerald-400 font-black uppercase' : 'text-[#71717a]'
+                                }`}
+                              >
+                                {isSelected
+                                  ? format === 'BO1'
+                                    ? 'Основная'
+                                    : `#${selectedIdx + 1}`
+                                  : 'Выбрать'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Expanded Pool */}
+                    <div className="lg:col-span-1 space-y-2 p-3 rounded-xl border border-purple-500/30 bg-purple-950/10">
+                      <span className="text-[11px] font-mono font-black uppercase tracking-wider text-purple-300 block pb-1 border-b border-purple-500/20">
+                        Расширенный пул
+                      </span>
+                      {EXPANDED_POOL_MAPS.map((map) => {
+                        const selectedIdx = presetMaps.indexOf(map.id);
+                        const isSelected = selectedIdx !== -1;
+                        const isMaxReached = presetMaps.length >= requiredPresetMapsCount && !isSelected;
+
+                        return (
+                          <button
+                            key={map.id}
+                            type="button"
+                            onClick={() => togglePresetMap(map.id)}
+                            className={`w-full group relative flex flex-col items-center p-2 rounded-xl border transition-all duration-200 select-none ${
+                              isSelected
+                                ? 'bg-emerald-950/30 border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-1 ring-emerald-400/40'
+                                : isMaxReached
+                                ? 'bg-[#121212] border border-[#222222] opacity-40 cursor-not-allowed'
+                                : 'bg-[#181818] border border-purple-500/40 hover:border-purple-300 hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
                             }`}
                           >
-                            {map.name}
-                          </span>
-                          <span
-                            className={`text-[10px] font-mono font-semibold transition-colors ${
-                              isSelected ? 'text-emerald-400 font-black uppercase' : 'text-[#71717a]'
-                            }`}
-                          >
-                            {isSelected
-                              ? format === 'BO1'
-                                ? 'Основная'
-                                : `#${selectedIdx + 1}`
-                              : 'Выбрать'}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            <div
+                              className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                                isSelected ? 'border-emerald-400/50' : 'border-purple-500/30'
+                              }`}
+                            >
+                              <img
+                                src={map.image}
+                                alt={map.name}
+                                className={`w-full h-full object-cover transition-all duration-200 ${
+                                  isSelected ? 'scale-105' : 'group-hover:scale-105'
+                                }`}
+                              />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                  <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                                  <span className="text-[8px] font-mono font-black text-emerald-300 uppercase tracking-wider">
+                                    {format === 'BO1'
+                                      ? 'ВЫБРАНА'
+                                      : selectedIdx === requiredPresetMapsCount - 1
+                                      ? `#${selectedIdx + 1} DEC`
+                                      : `#${selectedIdx + 1}`}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              className={`mt-1.5 pb-0.5 text-xs font-bold tracking-wide transition-colors ${
+                                isSelected ? 'text-emerald-300' : 'text-white'
+                              }`}
+                            >
+                              {map.name}
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono font-semibold transition-colors ${
+                                isSelected ? 'text-emerald-400 font-black uppercase' : 'text-purple-300'
+                              }`}
+                            >
+                              {isSelected ? `#${selectedIdx + 1}` : 'Выбрать'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

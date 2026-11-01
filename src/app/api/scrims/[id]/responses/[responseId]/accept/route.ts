@@ -107,6 +107,11 @@ export async function POST(
   // 6. Execute atomic transaction (Row Lock pattern using optimistic where condition)
   try {
     const match = await prisma.$transaction(async (tx) => {
+      const finalExcludedMaps = [...scrim.excludedMaps];
+      if (responseItem.disableVertigo && !finalExcludedMaps.includes('de_vertigo')) {
+        finalExcludedMaps.push('de_vertigo');
+      }
+
       // Atomic status change from OPEN -> MATCHED
       // If affected rows === 0, another concurrent request already accepted!
       const updateResult = await tx.scrimRequest.updateMany({
@@ -116,6 +121,7 @@ export async function POST(
         },
         data: {
           status: ScrimStatus.MATCHED,
+          excludedMaps: finalExcludedMaps,
         },
       });
 
