@@ -28,6 +28,7 @@ import {
   ListOrdered,
   Info,
   Lock,
+  Star,
 } from 'lucide-react';
 import { SERVER_LOCATIONS } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
@@ -80,7 +81,7 @@ function CreateScrimForm() {
   const [mapSelectionMode, setMapSelectionMode] = useState<'VETO' | 'PRESET'>('VETO');
   const [excludedMaps, setExcludedMaps] = useState<string[]>([]);
   const [presetMaps, setPresetMaps] = useState<string[]>([]);
-  const [showProBanBanner, setShowProBanBanner] = useState(false);
+
   const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
     if (user?.timezone && user.timezone !== 'SYSTEM') return user.timezone;
     return getSystemTimezone();
@@ -112,14 +113,16 @@ function CreateScrimForm() {
 
   React.useEffect(() => {
     if (!isPro) {
-      if (excludedMaps.length > 0) {
-        setExcludedMaps([]);
+      // Free users can keep Vertigo excluded, but Active Duty bans are prohibited
+      const activeDutyExcluded = excludedMaps.filter((m) => m !== 'de_vertigo');
+      if (activeDutyExcluded.length > 0) {
+        setExcludedMaps((prev) => prev.filter((m) => m === 'de_vertigo'));
       }
       if (slots.length > 2) {
         setSlots((prev) => prev.slice(0, 2));
       }
     }
-  }, [isPro, excludedMaps.length, slots.length]);
+  }, [isPro, excludedMaps, slots.length]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,9 +181,20 @@ function CreateScrimForm() {
   };
 
   const toggleMapExcluded = (mapId: string) => {
-    if (!isPro) {
-      setShowProBanBanner(true);
+    // Vertigo is an extra map: anyone (Free or PRO) can toggle it freely without spending limits
+    if (mapId === 'de_vertigo') {
+      if (excludedMaps.includes('de_vertigo')) {
+        setExcludedMaps(excludedMaps.filter((m) => m !== 'de_vertigo'));
+      } else {
+        setExcludedMaps([...excludedMaps, 'de_vertigo']);
+      }
       setError(null);
+      return;
+    }
+
+    // Active Duty map bans require PRO: redirect free users to subscription page
+    if (!isPro) {
+      router.push('/subscription');
       return;
     }
     if (excludedMaps.includes(mapId)) {
@@ -188,7 +202,7 @@ function CreateScrimForm() {
       setError(null);
     } else {
       const activeDutyExcluded = excludedMaps.filter((m) => m !== 'de_vertigo');
-      if (mapId !== 'de_vertigo' && activeDutyExcluded.length >= 2) {
+      if (activeDutyExcluded.length >= 2) {
         setError('С подпиской PRO можно исключить максимум 2 карты из соревновательного пула Active Duty');
         return;
       }
@@ -301,14 +315,15 @@ function CreateScrimForm() {
       return;
     }
 
-    if (!isPro && excludedMaps.length > 0) {
-      setError('Исключение карт доступно только с подпиской PRO.');
+    const activeDutyExcluded = excludedMaps.filter((m) => m !== 'de_vertigo');
+    if (!isPro && activeDutyExcluded.length > 0) {
+      setError('Исключение карт из соревновательного пула Active Duty доступно только с подпиской PRO.');
       setLoading(false);
       return;
     }
 
-    if (isPro && excludedMaps.length > 2) {
-      setError('С подпиской PRO можно исключить максимум 2 карты.');
+    if (isPro && activeDutyExcluded.length > 2) {
+      setError('С подпиской PRO можно исключить максимум 2 карты из соревновательного пула Active Duty.');
       setLoading(false);
       return;
     }
@@ -404,7 +419,7 @@ function CreateScrimForm() {
   }
 
   return (
-    <div className="container max-w-3xl py-10">
+    <div className="container max-w-4xl py-10">
       <Card className="border border-[#222222] bg-[#111111] shadow-2xl relative overflow-hidden">
         <CardHeader className="pb-4 pt-6 border-b border-[#222222]">
           <div className="flex items-center gap-3">
@@ -895,34 +910,6 @@ function CreateScrimForm() {
               {mapSelectionMode === 'VETO' ? (
                 /* Mode 1: Veto in Lobby (with optional bans) */
                 <div className="space-y-4">
-                  {/* Amber PRO banner - shown only on ban attempt for non-PRO */}
-                  {!isPro && showProBanBanner && (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span className="leading-relaxed">
-                          В бесплатном тарифе играется полный соревновательный пул карт (все 7 карт). С <strong className="text-white">подпиской PRO</strong> можно исключить до 2 любых карт перед вето!
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-                        <Link
-                          href="/subscription"
-                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-mono font-black text-[11px] uppercase tracking-wider whitespace-nowrap hover:from-amber-400 hover:to-yellow-300 shadow"
-                        >
-                          Подробнее о PRO
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => setShowProBanBanner(false)}
-                          className="p-1 rounded-md text-amber-400/80 hover:text-white hover:bg-white/10 transition-colors"
-                          title="Закрыть"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   {isPro && (
                     <div className="flex items-center justify-between text-xs text-[#a1a1aa]">
                       <span className="flex items-center gap-1.5 text-amber-400 font-bold">
@@ -943,25 +930,30 @@ function CreateScrimForm() {
                     </div>
                   )}
 
-                  {/* Unified Pool Layout: All 8 maps have identical card dimensions */}
-                  <div className="space-y-2 p-3 rounded-xl border border-[#222222] bg-[#0f0f0f]">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-[#1e1e1e] flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-mono font-black uppercase tracking-wider text-white">
-                          Список карт для вето
+                  {/* Pool Layout: Active Duty (7 maps) + Vertigo (Expanded pool) with identical card dimensions */}
+                  <div className="space-y-3 p-4 rounded-2xl border border-[#222222] bg-[#0c0c0d]">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-[#1c1c1f]">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="text-xs font-mono font-black uppercase tracking-wider text-white">
+                          Список карт Active Duty <span className="text-[#71717a] font-normal text-[11px]">(7 карт)</span>
                         </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[#a1a1aa]">
-                          7 Active Duty + Vertigo
+                        <span className="text-[#3f3f46] hidden sm:inline">•</span>
+                        <span className="text-xs font-mono font-bold text-purple-300 flex items-center gap-1.5">
+                          <span>Vertigo</span>
+                          <span className="text-[10px] text-purple-400/80 font-normal">(дополнительная карта)</span>
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-[#a1a1aa]">
+
+                      <span className="text-xs font-mono text-[#a1a1aa] shrink-0">
                         {isPro
                           ? `${excludedMaps.filter((m) => m !== 'de_vertigo').length}/2 исключено (PRO)`
-                          : 'Все 8 карт в пуле (Free)'}
+                          : '0/2 исключено (Free)'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 pt-1">
+                    {/* Cards Grid: all 8 cards have identical dimensions, Vertigo highlighted with purple */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5 items-stretch">
                       {ACTIVE_DUTY_MAPS.map((map) => {
                         const isExcluded = excludedMaps.includes(map.id);
                         return (
@@ -969,14 +961,14 @@ function CreateScrimForm() {
                             key={map.id}
                             type="button"
                             onClick={() => toggleMapExcluded(map.id)}
-                            className={`group relative flex flex-col items-center p-1.5 rounded-xl border transition-all duration-200 select-none ${
+                            className={`group relative flex flex-col items-center p-1 pb-2 sm:pb-2.5 rounded-xl border transition-all duration-200 select-none ${
                               isExcluded
                                 ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)] ring-1 ring-red-500/30'
-                                : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
+                                : 'bg-[#111113] border border-[#26262a] hover:border-white hover:bg-[#18181c] hover:scale-[1.02] shadow-sm'
                             }`}
                           >
                             <div
-                              className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                              className={`relative w-full aspect-[4/3] overflow-hidden rounded-lg border transition-colors ${
                                 isExcluded ? 'border-red-500/40' : 'border-white/10 group-hover:border-white/25'
                               }`}
                             >
@@ -984,36 +976,48 @@ function CreateScrimForm() {
                                 src={map.image}
                                 alt={map.name}
                                 className={`w-full h-full object-cover transition-all duration-200 ${
-                                  isExcluded ? 'grayscale opacity-40 scale-95' : 'group-hover:scale-105'
+                                  isExcluded ? 'grayscale opacity-35 scale-95' : 'group-hover:scale-105'
                                 }`}
                               />
                               {isExcluded && (
-                                <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                <div className="absolute inset-0 bg-red-950/75 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
                                   <Ban className="w-4 h-4 text-red-500 stroke-[2.5]" />
                                   <span className="text-[8px] font-mono font-black text-red-300 uppercase tracking-wider">
                                     БАН
                                   </span>
                                 </div>
                               )}
+                              {!isPro && (
+                                <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center pointer-events-none">
+                                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-black/80 border border-yellow-400/30 flex items-center justify-center shadow-2xl">
+                                    <svg
+                                      className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        clipRule="evenodd"
+                                        d="M12 2a5 5 0 00-5 5v3H6a3 3 0 00-3 3v6a3 3 0 003 3h12a3 3 0 003-3v-6a3 3 0 00-3-3h-1V7a5 5 0 00-5-5zm3 8V7a3 3 0 10-6 0v3h6zm-3 4a1.5 1.5 0 00-1 2.618V18a1 1 0 102 0v-1.382A1.5 1.5 0 0012 14z"
+                                      />
+                                    </svg>
+                                  </div>
+                                </div>
+                              )}
                             </div>
+
                             <span
-                              className={`mt-1.5 pb-0.5 text-[11px] font-bold tracking-wide transition-colors ${
+                              className={`mt-1.5 sm:mt-2 text-xs sm:text-sm font-bold tracking-tight text-center transition-colors ${
                                 isExcluded ? 'text-red-400 line-through' : 'text-white group-hover:text-white'
                               }`}
                             >
                               {map.name}
                             </span>
-                            <span
-                              className={`text-[9px] font-mono font-semibold transition-colors ${
-                                isExcluded ? 'text-red-400 uppercase' : 'text-[#71717a] group-hover:text-[#d4d4d8]'
-                              }`}
-                            >
-                              {isExcluded ? 'Исключена' : 'В пуле'}
-                            </span>
                           </button>
                         );
                       })}
 
+                      {/* Vertigo: identical dimensions, highlighted with purple, no EXP badge */}
                       {EXPANDED_POOL_MAPS.map((map) => {
                         const isExcluded = excludedMaps.includes(map.id);
                         return (
@@ -1021,31 +1025,26 @@ function CreateScrimForm() {
                             key={map.id}
                             type="button"
                             onClick={() => toggleMapExcluded(map.id)}
-                            className={`group relative flex flex-col items-center p-1.5 rounded-xl border transition-all duration-200 select-none ${
+                            className={`group relative flex flex-col items-center p-1 pb-2 sm:pb-2.5 rounded-xl border transition-all duration-200 select-none ${
                               isExcluded
-                                ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)]'
-                                : 'bg-[#181818] border border-purple-500/40 hover:border-purple-300 hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
+                                ? 'bg-red-950/25 border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)] ring-1 ring-red-500/30'
+                                : 'bg-[#161022] border-2 border-purple-500 shadow-[0_0_16px_rgba(168,85,247,0.25)] hover:border-purple-400 hover:bg-[#1f1530] hover:scale-[1.02]'
                             }`}
                           >
                             <div
-                              className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
-                                isExcluded ? 'border-red-500/40' : 'border-purple-500/30 group-hover:border-purple-300'
+                              className={`relative w-full aspect-[4/3] overflow-hidden rounded-lg border transition-colors ${
+                                isExcluded ? 'border-red-500/40' : 'border-purple-500/40 group-hover:border-purple-300'
                               }`}
                             >
                               <img
                                 src={map.image}
                                 alt={map.name}
                                 className={`w-full h-full object-cover transition-all duration-200 ${
-                                  isExcluded ? 'grayscale opacity-40 scale-95' : 'group-hover:scale-105'
+                                  isExcluded ? 'grayscale opacity-35 scale-95' : 'group-hover:scale-105'
                                 }`}
                               />
-                              {!isExcluded && (
-                                <span className="absolute top-1 right-1 text-[7px] font-mono font-black px-1 py-0.5 rounded bg-purple-950/85 text-purple-200 border border-purple-500/40 uppercase tracking-wider backdrop-blur-sm">
-                                  EXP
-                                </span>
-                              )}
                               {isExcluded && (
-                                <div className="absolute inset-0 bg-red-950/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
+                                <div className="absolute inset-0 bg-red-950/75 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
                                   <Ban className="w-4 h-4 text-red-500 stroke-[2.5]" />
                                   <span className="text-[8px] font-mono font-black text-red-300 uppercase tracking-wider">
                                     ОТКЛ
@@ -1053,23 +1052,35 @@ function CreateScrimForm() {
                                 </div>
                               )}
                             </div>
+
                             <span
-                              className={`mt-1.5 pb-0.5 text-[11px] font-bold tracking-wide transition-colors ${
-                                isExcluded ? 'text-red-400 line-through' : 'text-white'
+                              className={`mt-1.5 sm:mt-2 text-xs sm:text-sm font-bold tracking-tight text-center transition-colors ${
+                                isExcluded ? 'text-red-400 line-through' : 'text-purple-300 group-hover:text-white'
                               }`}
                             >
                               {map.name}
                             </span>
-                            <span
-                              className={`text-[9px] font-mono font-semibold transition-colors ${
-                                isExcluded ? 'text-red-400 uppercase' : 'text-purple-300'
-                              }`}
-                            >
-                              {isExcluded ? 'Отключена' : 'В пуле'}
-                            </span>
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* Bottom note centered & compact */}
+                    <div className="pt-2.5 border-t border-[#1a1a1d] flex items-center justify-center gap-1.5 text-[11px] font-sans text-[#a1a1aa]">
+                      <div className="w-3.5 h-3.5 rounded-[3px] bg-yellow-400 flex items-center justify-center shrink-0 shadow-sm">
+                        <Star className="w-2 h-2 text-black fill-black stroke-none" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Link
+                          href="/subscription"
+                          className="text-yellow-400 hover:text-yellow-300 font-bold hover:underline cursor-pointer transition-colors"
+                        >
+                          PRO
+                        </Link>
+                        <span className="text-[#a1a1aa]">
+                          - подписка позволит вам запрещать карты заранее
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1096,22 +1107,26 @@ function CreateScrimForm() {
                     )}
                   </div>
 
-                  <div className="space-y-2 p-3 rounded-xl border border-[#222222] bg-[#0f0f0f]">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-[#1e1e1e] flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-mono font-black uppercase tracking-wider text-white">
-                          Список доступных карт
+                  <div className="space-y-3 p-4 rounded-2xl border border-[#222222] bg-[#0c0c0d]">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-[#1c1c1f]">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="text-xs font-mono font-black uppercase tracking-wider text-white">
+                          Список доступных карт <span className="text-[#71717a] font-normal text-[11px]">(7 карт Active Duty)</span>
                         </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[#a1a1aa]">
-                          7 Active Duty + Vertigo
+                        <span className="text-[#3f3f46] hidden sm:inline">•</span>
+                        <span className="text-xs font-mono font-bold text-purple-300 flex items-center gap-1.5">
+                          <span>Vertigo</span>
+                          <span className="text-[10px] text-purple-400/80 font-normal">(дополнительная карта)</span>
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-[#a1a1aa]">
+
+                      <span className="text-xs font-mono text-[#a1a1aa] shrink-0">
                         Выбрано: {presetMaps.length}/{requiredPresetMapsCount}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 pt-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5 items-stretch">
                       {ACTIVE_DUTY_MAPS.map((map) => {
                         const selectedIdx = presetMaps.indexOf(map.id);
                         const isSelected = selectedIdx !== -1;
@@ -1122,16 +1137,16 @@ function CreateScrimForm() {
                             key={map.id}
                             type="button"
                             onClick={() => togglePresetMap(map.id)}
-                            className={`group relative flex flex-col items-center p-1.5 rounded-xl border transition-all duration-200 select-none ${
+                            className={`group relative flex flex-col items-center p-1 pb-2 sm:pb-2.5 rounded-xl border transition-all duration-200 select-none ${
                               isSelected
                                 ? 'bg-emerald-950/30 border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-1 ring-emerald-400/40'
                                 : isMaxReached
                                 ? 'bg-[#121212] border border-[#222222] opacity-40 cursor-not-allowed'
-                                : 'bg-[#181818] border border-[#333333] hover:border-white hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
+                                : 'bg-[#111113] border border-[#26262a] hover:border-white hover:bg-[#18181c] hover:scale-[1.02] shadow-sm'
                             }`}
                           >
                             <div
-                              className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
+                              className={`relative w-full aspect-[4/3] overflow-hidden rounded-lg border transition-colors ${
                                 isSelected ? 'border-emerald-400/50' : 'border-white/10 group-hover:border-white/25'
                               }`}
                             >
@@ -1156,14 +1171,14 @@ function CreateScrimForm() {
                               )}
                             </div>
                             <span
-                              className={`mt-1.5 pb-0.5 text-[11px] font-bold tracking-wide transition-colors ${
+                              className={`mt-1.5 sm:mt-2 text-xs sm:text-sm font-bold tracking-tight text-center transition-colors ${
                                 isSelected ? 'text-emerald-300' : 'text-white group-hover:text-white'
                               }`}
                             >
                               {map.name}
                             </span>
                             <span
-                              className={`text-[9px] font-mono font-semibold transition-colors ${
+                              className={`text-[9px] font-mono font-semibold transition-colors mt-0.5 ${
                                 isSelected ? 'text-emerald-400 font-black uppercase' : 'text-[#71717a]'
                               }`}
                             >
@@ -1187,17 +1202,17 @@ function CreateScrimForm() {
                             key={map.id}
                             type="button"
                             onClick={() => togglePresetMap(map.id)}
-                            className={`group relative flex flex-col items-center p-1.5 rounded-xl border transition-all duration-200 select-none ${
+                            className={`group relative flex flex-col items-center p-1 pb-2 sm:pb-2.5 rounded-xl border transition-all duration-200 select-none ${
                               isSelected
                                 ? 'bg-emerald-950/30 border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-1 ring-emerald-400/40'
                                 : isMaxReached
                                 ? 'bg-[#121212] border border-[#222222] opacity-40 cursor-not-allowed'
-                                : 'bg-[#181818] border border-purple-500/40 hover:border-purple-300 hover:bg-[#202020] hover:scale-[1.02] shadow-sm'
+                                : 'bg-[#161022] border-2 border-purple-500 shadow-[0_0_16px_rgba(168,85,247,0.25)] hover:border-purple-400 hover:bg-[#1f1530] hover:scale-[1.02]'
                             }`}
                           >
                             <div
-                              className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg border transition-colors ${
-                                isSelected ? 'border-emerald-400/50' : 'border-purple-500/30'
+                              className={`relative w-full aspect-[4/3] overflow-hidden rounded-lg border transition-colors ${
+                                isSelected ? 'border-emerald-400/50' : 'border-purple-500/40 group-hover:border-purple-300'
                               }`}
                             >
                               <img
@@ -1207,11 +1222,6 @@ function CreateScrimForm() {
                                   isSelected ? 'scale-105' : 'group-hover:scale-105'
                                 }`}
                               />
-                              {!isSelected && (
-                                <span className="absolute top-1 right-1 text-[7px] font-mono font-black px-1 py-0.5 rounded bg-purple-950/85 text-purple-200 border border-purple-500/40 uppercase tracking-wider backdrop-blur-sm">
-                                  EXP
-                                </span>
-                              )}
                               {isSelected && (
                                 <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-[1px] flex flex-col items-center justify-center gap-0.5">
                                   <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
@@ -1226,15 +1236,15 @@ function CreateScrimForm() {
                               )}
                             </div>
                             <span
-                              className={`mt-1.5 pb-0.5 text-[11px] font-bold tracking-wide transition-colors ${
-                                isSelected ? 'text-emerald-300' : 'text-white'
+                              className={`mt-1.5 sm:mt-2 text-xs sm:text-sm font-bold tracking-tight text-center transition-colors ${
+                                isSelected ? 'text-emerald-300' : 'text-purple-300 group-hover:text-white'
                               }`}
                             >
                               {map.name}
                             </span>
                             <span
-                              className={`text-[9px] font-mono font-semibold transition-colors ${
-                                isSelected ? 'text-emerald-400 font-black uppercase' : 'text-purple-300'
+                              className={`text-[9px] font-mono font-semibold transition-colors mt-0.5 ${
+                                isSelected ? 'text-emerald-400 font-black uppercase' : 'text-purple-400/80'
                               }`}
                             >
                               {isSelected ? `#${selectedIdx + 1}` : 'Выбрать'}

@@ -370,7 +370,7 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-1">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-xs font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
               <div className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
                 <span className="text-muted-foreground block text-[10px] uppercase font-bold">Бан карт</span>
                 <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
@@ -393,6 +393,12 @@ export default function SettingsPage() {
                 <span className="text-muted-foreground block text-[10px] uppercase font-bold">Отклики на прак</span>
                 <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
                   {user?.isPro ? 'Вверху списка (PRO)' : 'Обычный'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
+                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Винрейт карт</span>
+                <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
+                  {user?.isPro ? 'В профиле (PRO)' : 'Пусто (Free)'}
                 </span>
               </div>
               <div

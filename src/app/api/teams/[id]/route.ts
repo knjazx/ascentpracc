@@ -30,6 +30,8 @@ export async function GET(
               nickname: true,
               avatarUrl: true,
               steamId: true,
+              isPro: true,
+              proExpiresAt: true,
             },
           },
         },
@@ -197,10 +199,27 @@ export async function GET(
     .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
     .slice(0, 10);
 
+    const isTeamPro = Boolean(
+      team.isPro ||
+      team.managers.some((m) => {
+        const u = m.user;
+        return m.isOwner && u.isPro && (!u.proExpiresAt || new Date(u.proExpiresAt).getTime() > Date.now());
+      })
+    );
+
+    const sanitizedStats = team.stats
+      ? {
+          ...team.stats,
+          mapStats: isTeamPro ? (team.stats.mapStats || {}) : {},
+        }
+      : null;
+
     const payload = {
       success: true,
       data: {
         ...team,
+        isPro: isTeamPro,
+        stats: sanitizedStats,
         ratingsReceived,
         reportsReceived,
         avgPunctuality,

@@ -14,6 +14,7 @@ import { ChallengeModal } from '@/components/teams/ChallengeModal';
 import { FaceitBadge } from '@/components/ui/FaceitBadge';
 import { TrustGauge } from '@/components/ui/TrustGauge';
 import { TeamLogo } from '@/components/ui/TeamLogo';
+import { ACTIVE_DUTY_MAPS, EXPANDED_POOL_MAPS } from '@/lib/constants/maps';
 import {
   Trophy,
   Users,
@@ -32,6 +33,7 @@ import {
   X,
   Minus,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 
 interface TeamDetail {
@@ -48,6 +50,7 @@ interface TeamDetail {
   ratingCount: number;
   trustFactor?: number;
   activeReportsCount?: number;
+  isPro?: boolean;
   ratingsReceived?: Array<{
     id: string;
     punctuality: number;
@@ -256,6 +259,15 @@ export default function TeamProfilePage() {
     return `${count} оценок`;
   };
 
+  const getMapStat = (mapId: string, mapName: string) => {
+    if (!team?.stats?.mapStats) return null;
+    const s =
+      team.stats.mapStats[mapId] ||
+      team.stats.mapStats[mapName.toLowerCase()] ||
+      team.stats.mapStats[`de_${mapName.toLowerCase()}`];
+    return s || null;
+  };
+
   return (
     <div className="container py-8 space-y-8">
       {/* Team Header Banner */}
@@ -281,6 +293,12 @@ export default function TeamProfilePage() {
                 <Badge variant="cs" className="text-xs px-2 py-0.5">
                   [{team.tag}]
                 </Badge>
+                {team.isPro && (
+                  <Badge className="bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs px-2.5 py-0.5 flex items-center gap-1 shadow-sm">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>PRO</span>
+                  </Badge>
+                )}
                 {team.avgElo && (
                   <FaceitBadge elo={team.avgElo} size="md" />
                 )}
@@ -425,87 +443,306 @@ export default function TeamProfilePage() {
 
       {/* Tab: Overview */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Key Stats Card */}
-          <Card className="md:col-span-2 border border-[#222222] bg-[#111111] shadow-xl p-6 space-y-6">
-            <h2 className="text-lg font-bold text-white">Статистика выступлений</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
-                <span className="text-xs uppercase font-mono text-[#a1a1aa]">Винрейт</span>
-                <p className={`text-3xl font-black mt-1 font-mono ${getWinRateColor(winRate)}`}>{winRate}%</p>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Key Stats Card */}
+            <Card className="md:col-span-2 border border-[#222222] bg-[#111111] shadow-xl p-6 space-y-6">
+              <h2 className="text-lg font-bold text-white">Статистика выступлений</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
+                  <span className="text-xs uppercase font-mono text-[#a1a1aa]">Винрейт</span>
+                  <p className={`text-3xl font-black mt-1 font-mono ${getWinRateColor(winRate)}`}>{winRate}%</p>
+                </div>
+                <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
+                  <span className="text-xs uppercase font-mono text-[#a1a1aa]">Матчей</span>
+                  <p className="text-3xl font-black text-white mt-1 font-mono">
+                    {team.stats?.matchesPlayed || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
+                  <span className="text-xs uppercase font-mono text-[#a1a1aa]">Побед</span>
+                  <p className="text-3xl font-black text-white mt-1 font-mono">
+                    {team.stats?.wins || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
+                  <span className="text-xs uppercase font-mono text-[#a1a1aa]">Поражений</span>
+                  <p className="text-3xl font-black text-[#ef4444] mt-1 font-mono">
+                    {team.stats?.losses || 0}
+                  </p>
+                </div>
               </div>
-              <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
-                <span className="text-xs uppercase font-mono text-[#a1a1aa]">Матчей</span>
-                <p className="text-3xl font-black text-white mt-1 font-mono">
-                  {team.stats?.matchesPlayed || 0}
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
-                <span className="text-xs uppercase font-mono text-[#a1a1aa]">Побед</span>
-                <p className="text-3xl font-black text-white mt-1 font-mono">
-                  {team.stats?.wins || 0}
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#222222] bg-[#0a0a0a] p-4 text-center">
-                <span className="text-xs uppercase font-mono text-[#a1a1aa]">Поражений</span>
-                <p className="text-3xl font-black text-[#ef4444] mt-1 font-mono">
-                  {team.stats?.losses || 0}
-                </p>
-              </div>
-            </div>
 
-            {/* Form */}
-            <div className="border-t border-[#222222] pt-4 flex items-center justify-between">
-              <span className="text-xs uppercase font-semibold text-[#a1a1aa]">Форма команды (последние игры)</span>
-              <div className="flex items-center gap-1.5">
-                {(team.stats?.form || '-----').split('').map((char, index) => {
-                  if (char === 'W') {
+              {/* Form */}
+              <div className="border-t border-[#222222] pt-4 flex items-center justify-between">
+                <span className="text-xs uppercase font-semibold text-[#a1a1aa]">Форма команды (последние игры)</span>
+                <div className="flex items-center gap-1.5">
+                  {(team.stats?.form || '-----').split('').map((char, index) => {
+                    if (char === 'W') {
+                      return (
+                        <span key={index} className="w-6 h-6 rounded flex items-center justify-center bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/40 text-xs font-bold font-mono">
+                          W
+                        </span>
+                      );
+                    }
+                    if (char === 'L') {
+                      return (
+                        <span key={index} className="w-6 h-6 rounded flex items-center justify-center bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/40 text-xs font-bold font-mono">
+                          L
+                        </span>
+                      );
+                    }
                     return (
-                      <span key={index} className="w-6 h-6 rounded flex items-center justify-center bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/40 text-xs font-bold font-mono">
-                        W
+                      <span key={index} className="w-6 h-6 rounded flex items-center justify-center bg-[#0a0a0a] text-[#52525b] border border-[#222222] text-xs font-mono">
+                        -
                       </span>
                     );
-                  }
-                  if (char === 'L') {
-                    return (
-                      <span key={index} className="w-6 h-6 rounded flex items-center justify-center bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/40 text-xs font-bold font-mono">
-                        L
-                      </span>
-                    );
-                  }
-                  return (
-                    <span key={index} className="w-6 h-6 rounded flex items-center justify-center bg-[#0a0a0a] text-[#52525b] border border-[#222222] text-xs font-mono">
-                      -
-                    </span>
-                  );
-                })}
+                  })}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
 
-          {/* Managers List */}
-          <Card className="border border-[#222222] bg-[#111111] shadow-xl p-6 space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Users className="w-4 h-4 text-white" />
-              <span>Управляющие ({team.managers.length})</span>
-            </h2>
-            <div className="space-y-3">
-              {team.managers.map((m) => (
-                <div key={m.user.id} className="flex items-center justify-between p-2.5 rounded-lg border border-[#222222] bg-[#0a0a0a]">
-                  <div className="flex items-center gap-3">
-                    <Avatar src={m.user.avatarUrl} alt={m.user.nickname} fallback={m.user.nickname} size="sm" />
-                    <div>
-                      <p className="text-xs font-bold text-white leading-none">{m.user.nickname}</p>
+            {/* Managers List */}
+            <Card className="border border-[#222222] bg-[#111111] shadow-xl p-6 space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-white" />
+                <span>Управляющие ({team.managers.length})</span>
+              </h2>
+              <div className="space-y-3">
+                {team.managers.map((m) => (
+                  <div key={m.user.id} className="flex items-center justify-between p-2.5 rounded-lg border border-[#222222] bg-[#0a0a0a]">
+                    <div className="flex items-center gap-3">
+                      <Avatar src={m.user.avatarUrl} alt={m.user.nickname} fallback={m.user.nickname} size="sm" />
+                      <div>
+                        <p className="text-xs font-bold text-white leading-none">{m.user.nickname}</p>
+                      </div>
                     </div>
+                    {m.isOwner ? (
+                      <Badge variant="cs" className="text-[10px] px-1.5 py-0">Владелец</Badge>
+                    ) : (
+                      <span className="text-[10px] text-[#a1a1aa] font-mono">Со-упр.</span>
+                    )}
                   </div>
-                  {m.isOwner ? (
-                    <Badge variant="cs" className="text-[10px] px-1.5 py-0">Владелец</Badge>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* Map Pool Winrates */}
+          <Card className="border border-[#222222] bg-[#111111] shadow-xl p-6 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#222222] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-white">Винрейт по картам</h2>
+                  {team.isPro ? (
+                    <Badge className="bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      <span>PRO</span>
+                    </Badge>
                   ) : (
-                    <span className="text-[10px] text-[#a1a1aa] font-mono">Со-упр.</span>
+                    <Badge variant="outline" className="border-[#262626] text-[#71717a] text-[10px] font-mono">
+                      FREE
+                    </Badge>
                   )}
                 </div>
-              ))}
+                <p className="text-xs text-[#a1a1aa] mt-0.5">
+                  {team.isPro
+                    ? 'Подробный винрейт и статистика сыгранных матчей команды на каждой соревновательной карте.'
+                    : 'Подробный винрейт на каждой карте доступен только для команд с тарифом PRO.'}
+                </p>
+              </div>
+
+              {team.isPro && (
+                <div className="flex items-center gap-3 text-xs font-mono text-[#a1a1aa]">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span>≥50% WR</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    <span>&lt;50% WR</span>
+                  </span>
+                </div>
+              )}
             </div>
+
+            {!team.isPro ? (
+              <div className="py-12 text-center rounded-xl border border-dashed border-[#222222] bg-[#0a0a0a] space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-[#71717a]">
+                  <Sparkles className="w-6 h-6 text-amber-500/40" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">Статистика по картам пуста</p>
+                  <p className="text-xs text-[#71717a] max-w-md mx-auto font-mono">
+                    У команды бесплатный тариф. Подробный винрейт на каждой карте отображается только для команд с подпиской PRO.
+                  </p>
+                </div>
+                {isManager && (
+                  <div className="pt-2">
+                    <Link href="/subscription">
+                      <Button
+                        size="sm"
+                        className="text-xs font-bold bg-gradient-to-r from-amber-500 to-yellow-400 text-black hover:opacity-90 shadow-md"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                        Подключить PRO
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 items-stretch">
+                  {/* 7 Active Duty Maps */}
+                  {ACTIVE_DUTY_MAPS.map((map) => {
+                    const stat = getMapStat(map.id, map.name);
+                    const played = stat?.played || 0;
+                    const wins = stat?.wins || 0;
+                    const losses = stat?.losses || 0;
+                    const wr = played > 0 ? Math.round(stat!.winRate * 100) : null;
+
+                    return (
+                      <div
+                        key={map.id}
+                        className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-[#222222] bg-[#0c0c0c] hover:border-[#383838] transition-all group"
+                      >
+                        {/* Map Thumbnail */}
+                        <div className="relative aspect-[3/2] w-full overflow-hidden bg-neutral-900">
+                          <Image
+                            src={map.image}
+                            alt={map.name}
+                            fill
+                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            unoptimized
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c0c] via-black/40 to-transparent" />
+                        </div>
+
+                        {/* Card Details */}
+                        <div className="p-3 space-y-2">
+                          <div>
+                            <span className="text-xs font-black uppercase tracking-wider text-white block truncate">
+                              {map.name}
+                            </span>
+                            <span className="text-[10px] text-[#71717a] font-mono">
+                              {played > 0 ? `${wins}W · ${losses}L` : '0 матчей'}
+                            </span>
+                          </div>
+
+                          {/* Winrate row */}
+                          <div className="pt-1.5 border-t border-[#1a1a1a] flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-mono text-[#71717a]">WR</span>
+                            <span
+                              className={`text-xs font-mono font-black ${
+                                wr === null
+                                  ? 'text-neutral-400'
+                                  : wr >= 50
+                                  ? 'text-emerald-400'
+                                  : 'text-rose-400'
+                              }`}
+                            >
+                              {wr !== null ? `${wr}%` : '—'}
+                            </span>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="w-full bg-[#181818] h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                wr === null
+                                  ? 'bg-transparent'
+                                  : wr >= 50
+                                  ? 'bg-emerald-400'
+                                  : 'bg-rose-500'
+                              }`}
+                              style={{
+                                width: `${wr !== null ? Math.min(100, Math.max(5, wr)) : 0}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Vertigo (Expanded Pool) in 8th column */}
+                  {EXPANDED_POOL_MAPS.map((map) => {
+                    const stat = getMapStat(map.id, map.name);
+                    const played = stat?.played || 0;
+                    const wins = stat?.wins || 0;
+                    const losses = stat?.losses || 0;
+                    const wr = played > 0 ? Math.round(stat!.winRate * 100) : null;
+
+                    return (
+                      <div
+                        key={map.id}
+                        className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-purple-500/30 bg-[#120a1c] hover:border-purple-500/60 transition-all group lg:pl-3 lg:border-l lg:border-purple-500/25"
+                      >
+                        {/* Map Thumbnail */}
+                        <div className="relative aspect-[3/2] w-full overflow-hidden bg-neutral-900">
+                          <Image
+                            src={map.image}
+                            alt={map.name}
+                            fill
+                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            unoptimized
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#120a1c] via-purple-950/40 to-transparent" />
+                          <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-purple-600/90 text-white uppercase tracking-wider shadow">
+                            EXP
+                          </span>
+                        </div>
+
+                        {/* Card Details */}
+                        <div className="p-3 space-y-2">
+                          <div>
+                            <span className="text-xs font-black uppercase tracking-wider text-purple-200 block truncate">
+                              {map.name}
+                            </span>
+                            <span className="text-[10px] text-purple-400/70 font-mono">
+                              {played > 0 ? `${wins}W · ${losses}L` : '0 матчей'}
+                            </span>
+                          </div>
+
+                          {/* Winrate row */}
+                          <div className="pt-1.5 border-t border-purple-500/20 flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-mono text-purple-300/70">WR</span>
+                            <span
+                              className={`text-xs font-mono font-black ${
+                                wr === null
+                                  ? 'text-neutral-400'
+                                  : wr >= 50
+                                  ? 'text-emerald-400'
+                                  : 'text-rose-400'
+                              }`}
+                            >
+                              {wr !== null ? `${wr}%` : '—'}
+                            </span>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="w-full bg-[#1e1330] h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                wr === null
+                                  ? 'bg-transparent'
+                                  : wr >= 50
+                                  ? 'bg-emerald-400'
+                                  : 'bg-rose-500'
+                              }`}
+                              style={{
+                                width: `${wr !== null ? Math.min(100, Math.max(5, wr)) : 0}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       )}

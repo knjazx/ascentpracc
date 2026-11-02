@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
                 nickname: true,
                 avatarUrl: true,
                 steamId: true,
+                isPro: true,
+                proExpiresAt: true,
               },
             },
           },
@@ -87,10 +89,27 @@ export async function GET(request: NextRequest) {
         const penalty = (team.noShowCount * 20);
         const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
 
+        const isTeamPro = Boolean(
+          team.isPro ||
+          team.managers.some((m) => {
+            const u = m.user;
+            return m.isOwner && u.isPro && (!u.proExpiresAt || new Date(u.proExpiresAt).getTime() > Date.now());
+          })
+        );
+
+        const sanitizedStats = team.stats
+          ? {
+              ...team.stats,
+              mapStats: isTeamPro ? (team.stats.mapStats || {}) : {},
+            }
+          : null;
+
         const { ratingsReceived, _count, ...restTeam } = team;
 
         return {
           ...restTeam,
+          isPro: isTeamPro,
+          stats: sanitizedStats,
           totalMatches: _count.matchesAsTeamA + _count.matchesAsTeamB,
           ratingCount,
           avgPunctuality,
@@ -166,6 +185,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isUserPro = Boolean(
+      user.isPro && (!user.proExpiresAt || new Date(user.proExpiresAt).getTime() > Date.now())
+    );
+
     // Create Team + Owner Manager + Initial Stats in single transaction
     const newTeam = await prisma.$transaction(async (tx) => {
       const team = await tx.team.create({
@@ -176,6 +199,7 @@ export async function POST(request: NextRequest) {
           avgElo: validated.avgElo ?? null,
           discordInvite: validated.discordInvite || null,
           logoUrl: validated.logoUrl || null,
+          isPro: isUserPro,
           managers: {
             create: {
               userId: user.id,

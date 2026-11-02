@@ -177,6 +177,10 @@ export default function SubscriptionPage() {
                   <X className="w-4 h-4 text-neutral-600 shrink-0 mt-0.5" />
                   <span>Оповещения через Discord Webhook в канал команды</span>
                 </li>
+                <li className="flex items-start gap-2.5 text-neutral-400">
+                  <X className="w-4 h-4 text-neutral-600 shrink-0 mt-0.5" />
+                  <span>Винрейт по картам в профиле команды (пусто в Free)</span>
+                </li>
               </ul>
             </CardContent>
           </div>
@@ -277,6 +281,12 @@ export default function SubscriptionPage() {
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5 stroke-[2.5]" />
                   <span>
                     <strong className="text-amber-400">Внешний вид PRO</strong>: золотой бейдж в профиле, лобби и карточке прака
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5 text-white">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5 stroke-[2.5]" />
+                  <span>
+                    <strong className="text-amber-400">Винрейт по каждой карте</strong>: подробная статистика и процент побед на всех картах в профиле команды
                   </span>
                 </li>
               </ul>

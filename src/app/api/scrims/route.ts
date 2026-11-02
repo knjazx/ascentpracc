@@ -232,21 +232,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Excluded maps: Free cannot exclude maps (0), PRO can exclude up to 2 maps
-    if (!isPro && validated.excludedMaps.length > 0) {
+    // Excluded maps: Free cannot exclude Active Duty maps, PRO can exclude up to 2 maps from Active Duty.
+    // Vertigo (de_vertigo) is an expanded pool map that can be disabled by anyone without spending ban limits.
+    const activeDutyExcluded = validated.excludedMaps.filter((m) => m !== 'de_vertigo');
+    if (!isPro && activeDutyExcluded.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Исключение карт доступно только с подпиской PRO. В бесплатном тарифе играются все карты соревновательного пула.',
+          error: 'Исключение карт из соревновательного пула Active Duty доступно только с подпиской PRO.',
         },
         { status: 400 }
       );
     }
-    if (isPro && validated.excludedMaps.length > 2) {
+    if (isPro && activeDutyExcluded.length > 2) {
       return NextResponse.json(
         {
           success: false,
-          error: 'С подпиской PRO можно исключить максимум 2 карты.',
+          error: 'С подпиской PRO можно исключить максимум 2 карты из соревновательного пула Active Duty.',
         },
         { status: 400 }
       );

@@ -143,14 +143,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!challengerIsPro && Array.isArray(excludedMaps) && excludedMaps.length > 0) {
+    const activeDutyExcluded = Array.isArray(excludedMaps)
+      ? excludedMaps.filter((m: string) => m !== 'de_vertigo')
+      : [];
+    if (!challengerIsPro && activeDutyExcluded.length > 0) {
       return NextResponse.json(
-        { success: false, error: 'Исключение карт доступно только с подпиской PRO' },
+        { success: false, error: 'Исключение карт из пула Active Duty доступно только с подпиской PRO' },
         { status: 400 }
       );
     }
 
-    if (challengerIsPro && Array.isArray(excludedMaps) && excludedMaps.filter((m: string) => m !== 'de_vertigo').length > 2) {
+    if (challengerIsPro && activeDutyExcluded.length > 2) {
       return NextResponse.json(
         { success: false, error: 'С подпиской PRO можно исключить максимум 2 карты из Active Duty' },
         { status: 400 }
