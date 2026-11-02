@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useUser } from '@/hooks/useUser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,12 @@ import {
   Loader2,
   Bot,
   HelpCircle,
+  RefreshCw,
+  Sparkles,
+  Lock,
+  Key,
+  Gift,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -30,12 +37,80 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Syncing with Steam
+  const [syncingSteam, setSyncingSteam] = useState(false);
+  const [syncSteamSuccess, setSyncSteamSuccess] = useState<string | null>(null);
+
+  const handleSyncSteam = async () => {
+    setSyncingSteam(true);
+    setSyncSteamSuccess(null);
+    setError(null);
+    try {
+      const res = await fetch('/api/me/sync-steam', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Не удалось синхронизировать профиль со Steam');
+      }
+      await refreshUser();
+      setSyncSteamSuccess(data.message || 'Никнейм и аватар успешно синхронизированы со Steam!');
+      setTimeout(() => setSyncSteamSuccess(null), 4000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка при синхронизации со Steam');
+    } finally {
+      setSyncingSteam(false);
+    }
+  };
+
   // Testing Discord DM
   const [testingDiscord, setTestingDiscord] = useState(false);
   const [testDiscordResult, setTestDiscordResult] = useState<{
     success: boolean;
     message: string;
   } | null>(null);
+
+  // PRO Subscription & Discord Webhook
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState('');
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [testWebhookResult, setTestWebhookResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  // Activation Code State
+  const [activationCode, setActivationCode] = useState('');
+  const [activatingCode, setActivatingCode] = useState(false);
+  const [codeSuccessMsg, setCodeSuccessMsg] = useState<string | null>(null);
+  const [codeErrorMsg, setCodeErrorMsg] = useState<string | null>(null);
+
+  const handleActivateCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activationCode.trim()) return;
+
+    setActivatingCode(true);
+    setCodeSuccessMsg(null);
+    setCodeErrorMsg(null);
+
+    try {
+      const res = await fetch('/api/subscription/activate-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: activationCode.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Не удалось активировать код');
+      }
+
+      setCodeSuccessMsg(data.message);
+      setActivationCode('');
+      await refreshUser();
+    } catch (err: unknown) {
+      setCodeErrorMsg(err instanceof Error ? err.message : 'Ошибка при активации');
+    } finally {
+      setActivatingCode(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -51,8 +126,45 @@ export default function SettingsPage() {
       setTimezone(user.timezone || 'SYSTEM');
       setDiscordTag(user.discordTag || '');
       setDiscordId(user.discordId || '');
+      setDiscordWebhookUrl(user.discordWebhookUrl || '');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#discord-webhook') {
+      setTimeout(() => {
+        const el = document.getElementById('discord-webhook');
+        el?.scrollIntoView({ behavior: 'smooth' });
+        el?.classList.add('ring-2', 'ring-amber-500');
+        setTimeout(() => el?.classList.remove('ring-2', 'ring-amber-500'), 2500);
+      }, 300);
+    }
+  }, []);
+
+  const handleTestWebhook = async () => {
+    if (!discordWebhookUrl.trim()) return;
+    setTestingWebhook(true);
+    setTestWebhookResult(null);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/notifications/test-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: discordWebhookUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setTestWebhookResult({ success: false, message: data.error || 'Ошибка отправки тестового вебхука' });
+      } else {
+        setTestWebhookResult({ success: true, message: data.message || 'Тестовое уведомление успешно отправлено в ваш Discord!' });
+      }
+    } catch (err: unknown) {
+      setTestWebhookResult({ success: false, message: err instanceof Error ? err.message : 'Сетевая ошибка' });
+    } finally {
+      setTestingWebhook(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +172,7 @@ export default function SettingsPage() {
     setError(null);
     setSaved(false);
     setTestDiscordResult(null);
+    setTestWebhookResult(null);
 
     try {
       const res = await fetch('/api/me', {
@@ -69,6 +182,7 @@ export default function SettingsPage() {
           timezone: detectedTz || 'SYSTEM',
           discordTag: discordTag.trim() || null,
           discordId: discordId.trim() || null,
+          discordWebhookUrl: discordWebhookUrl.trim() || null,
         }),
       });
 
@@ -109,6 +223,11 @@ export default function SettingsPage() {
 
       const res = await fetch('/api/me/discord-test', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          discordTag: discordTag.trim() || null,
+          discordId: discordId.trim() || null,
+        }),
       });
       const data = await res.json();
 
@@ -170,16 +289,188 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <a
-              href={`https://steamcommunity.com/profiles/${user.steamId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="outline" size="sm" className="gap-2 text-xs border-neutral-700 hover:bg-neutral-800 text-white">
-                <span>Профиль Steam</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSyncSteam}
+                disabled={syncingSteam}
+                className="gap-2 text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingSteam ? 'animate-spin' : ''}`} />
+                <span>{syncingSteam ? 'Синхронизация...' : 'Синхронизировать со Steam'}</span>
               </Button>
-            </a>
+
+              <a
+                href={`https://steamcommunity.com/profiles/${user.steamId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" size="sm" className="gap-2 text-xs border-neutral-700 hover:bg-neutral-800 text-white">
+                  <span>Профиль Steam</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+          {syncSteamSuccess && (
+            <div className="px-6 pb-4">
+              <p className="text-xs text-emerald-400 font-mono flex items-center gap-1.5">
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span>{syncSteamSuccess}</span>
+              </p>
+            </div>
+          )}
+        </Card>
+
+        {/* Subscription Plan Card */}
+        <Card
+          className={`border shadow-xl transition-all ${
+            user?.isPro
+              ? 'border-amber-500/50 bg-gradient-to-b from-[#181307] to-[#0f0e0c]'
+              : 'border-border bg-card'
+          }`}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-lg">Тарифный план</CardTitle>
+                  {user?.isPro ? (
+                    <Badge variant="cs" className="bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black uppercase text-xs">
+                      ⭐ PRO АКТИВЕН
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs font-mono font-bold text-neutral-400">
+                      FREE (Бесплатный)
+                    </Badge>
+                  )}
+                  {user?.isPro && user?.proExpiresAt && (
+                    <Badge variant="outline" className="border-amber-500/30 text-amber-300 text-[11px] font-mono">
+                      До {new Date(user.proExpiresAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </Badge>
+                  )}
+                </div>
+                <CardDescription>
+                  {user?.isPro
+                    ? 'Ваш аккаунт имеет статус PRO. Доступны расширенные возможности при создании праков и вето.'
+                    : 'Базовый тариф с ограничением по картам, серверам и слотам времени.'}
+                </CardDescription>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/subscription"
+                  className="px-3.5 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-xs font-bold font-mono text-amber-300 hover:bg-amber-500/20 transition-colors"
+                >
+                  Управление тарифами
+                </Link>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-xs font-mono">
+              <div className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
+                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Бан карт</span>
+                <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
+                  {user?.isPro ? 'До 2 карт (PRO)' : '0 карт (Все в пуле)'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
+                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Слоты со временем</span>
+                <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
+                  {user?.isPro ? 'До 3 слотов (PRO)' : 'До 2 слотов'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
+                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Выбор серверов</span>
+                <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
+                  {user?.isPro ? 'От 1 до 4 (PRO)' : 'Ровно 4'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
+                <span className="text-muted-foreground block text-[10px] uppercase font-bold">Отклики на прак</span>
+                <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
+                  {user?.isPro ? 'Вверху списка (PRO)' : 'Обычный'}
+                </span>
+              </div>
+              <div
+                onClick={() => {
+                  const el = document.getElementById('discord-webhook');
+                  el?.scrollIntoView({ behavior: 'smooth' });
+                  el?.classList.add('ring-2', 'ring-amber-500');
+                  setTimeout(() => el?.classList.remove('ring-2', 'ring-amber-500'), 2500);
+                }}
+                className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1 col-span-2 sm:col-span-1 cursor-pointer hover:border-amber-500/40 transition-all group select-none"
+                title="Нажмите, чтобы перейти к настройке Webhook"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground block text-[10px] uppercase font-bold group-hover:text-amber-300 transition-colors">
+                    Discord Webhook
+                  </span>
+                  <ChevronRight className="w-3 h-3 text-neutral-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
+                </div>
+                <span className={user?.isPro ? 'text-amber-400 font-bold' : 'text-neutral-400'}>
+                  {user?.isPro ? 'Настроить (PRO) ↗' : 'Недоступен'}
+                </span>
+              </div>
+            </div>
+
+            {/* Code Activation mini-card */}
+            <div className="p-3.5 rounded-xl border border-amber-500/20 bg-black/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5" />
+                  <span>Активация по промокоду / ключу</span>
+                </span>
+                <span className="text-[11px] font-mono text-neutral-500">
+                  Купили на основном сайте?
+                </span>
+              </div>
+
+              <form onSubmit={handleActivateCode} className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type="text"
+                      placeholder="PRO-XXXX-XXXX"
+                      value={activationCode}
+                      onChange={(e) => setActivationCode(e.target.value.toUpperCase())}
+                      disabled={activatingCode}
+                      className="h-9 bg-neutral-900/90 border-neutral-700 text-xs font-mono tracking-wider uppercase text-white"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={activatingCode || !activationCode.trim()}
+                    size="sm"
+                    className="h-9 px-4 font-mono font-bold text-xs uppercase bg-amber-500 hover:bg-amber-400 text-black shrink-0 gap-1.5"
+                  >
+                    {activatingCode ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Gift className="w-3.5 h-3.5" />
+                    )}
+                    <span>Активировать</span>
+                  </Button>
+                </div>
+
+                {codeSuccessMsg && (
+                  <div className="p-2.5 rounded-lg border border-emerald-500/40 bg-emerald-950/20 text-emerald-300 text-xs font-mono flex items-center gap-2">
+                    <Check className="w-4 h-4 shrink-0 text-emerald-400 stroke-[2.5]" />
+                    <span>{codeSuccessMsg}</span>
+                  </div>
+                )}
+
+                {codeErrorMsg && (
+                  <div className="p-2.5 rounded-lg border border-rose-500/40 bg-rose-950/20 text-rose-300 text-xs font-mono flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>{codeErrorMsg}</span>
+                  </div>
+                )}
+              </form>
+            </div>
           </CardContent>
         </Card>
 
@@ -335,6 +626,75 @@ export default function SettingsPage() {
                       <Send className="w-3.5 h-3.5" />
                     )}
                     <span>{testingDiscord ? 'Проверка...' : 'Проверить ЛС'}</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Discord Webhook Section (PRO feature) */}
+              <div
+                id="discord-webhook"
+                className={`p-4 rounded-xl border space-y-3 transition-all scroll-mt-20 ${
+                  user?.isPro
+                    ? 'border-amber-500/30 bg-[#14120a]'
+                    : 'border-neutral-800 bg-neutral-900/40 opacity-70'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white flex items-center gap-1.5 font-mono">
+                      <span>🔔 Discord Webhook оповещения</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        PRO
+                      </span>
+                    </span>
+                  </div>
+                  {!user?.isPro && (
+                    <span className="text-[11px] text-amber-400 flex items-center gap-1 font-mono">
+                      <Lock className="w-3 h-3" />
+                      <span>Доступно с подпиской PRO</span>
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-[#a1a1aa]">
+                  Укажите ссылку на Webhook в вашем Discord-сервере. Когда соперник откликнется на ваш прак или бросит вызов, оповещение мгновенно придет прямо в ваш текстовый канал.
+                </p>
+
+                {testWebhookResult && (
+                  <div
+                    className={`p-2.5 rounded-lg text-xs font-mono border ${
+                      testWebhookResult.success
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                        : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+                    }`}
+                  >
+                    {testWebhookResult.message}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    type="url"
+                    disabled={!user?.isPro}
+                    placeholder="https://discord.com/api/webhooks/..."
+                    value={discordWebhookUrl}
+                    onChange={(e) => setDiscordWebhookUrl(e.target.value)}
+                    className="bg-[#0b0a0e] border-neutral-800 font-mono text-xs flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!user?.isPro || testingWebhook || !discordWebhookUrl.trim()}
+                    onClick={handleTestWebhook}
+                    className="h-9 px-4 text-xs font-bold gap-1.5 border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                  >
+                    {testingWebhook ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    <span>Проверить Webhook</span>
                   </Button>
                 </div>
               </div>

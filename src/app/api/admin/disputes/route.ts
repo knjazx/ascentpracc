@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { Role, MatchStatus } from '@prisma/client';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(_request: NextRequest) {
   const user = await getCurrentUser();
   if (!user || user.role !== Role.ADMIN) {

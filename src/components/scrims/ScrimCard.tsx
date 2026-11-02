@@ -21,6 +21,7 @@ import {
 import { SERVER_LOCATION_MAP } from '@/lib/constants/servers';
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { FaceitBadge } from '@/components/ui/FaceitBadge';
+import { TeamLogo } from '@/components/ui/TeamLogo';
 
 function getWinRateColor(rate: number) {
   if (rate < 50) return 'text-red-500';
@@ -30,6 +31,7 @@ function getWinRateColor(rate: number) {
 
 export interface ScrimCardData {
   id: string;
+  isPro?: boolean;
   format: 'BO1' | 'BO2' | 'BO3' | 'BO5';
   platform?: string;
   level: string | null;
@@ -48,6 +50,7 @@ export interface ScrimCardData {
     logoUrl: string | null;
     avgElo?: number | null;
     noShowCount: number;
+    isPro?: boolean;
     stats?: {
       winRate: number;
       matchesPlayed: number;
@@ -60,7 +63,7 @@ export interface ScrimCardData {
   }>;
 }
 
-export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
+export const ScrimCard = React.memo(function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
   const { user } = useUser();
   const userTimezone = user?.timezone || 'Europe/Kyiv';
 
@@ -81,32 +84,35 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
     ? Math.round(scrim.team.stats.winRate * 100)
     : 0;
 
+  const isProScrim = Boolean(scrim.isPro || scrim.team.isPro);
+
   return (
-    <Card className="border border-[#222222] bg-[#111111] hover:border-white hover:bg-[#141414] transition-all duration-200 shadow-lg relative overflow-hidden flex flex-col justify-between group">
+    <Card
+      className={`transition-all duration-200 shadow-lg relative overflow-hidden flex flex-col justify-between group ${
+        isProScrim
+          ? 'border-amber-500/50 bg-gradient-to-b from-[#181409] via-[#111111] to-[#0d0d0d] hover:border-amber-400 hover:shadow-amber-950/30'
+          : 'border border-[#222222] bg-[#111111] hover:border-white hover:bg-[#141414]'
+      }`}
+    >
+      {isProScrim && (
+        <div className="absolute top-0 right-0 left-0 bg-gradient-to-r from-amber-500/40 via-yellow-400/40 to-transparent h-1" />
+      )}
       <CardContent className="p-5 space-y-4">
         {/* Header: Team & Badges */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <Link href={`/teams/${scrim.team.id}`}>
-              <div className="relative w-12 h-12 rounded-lg bg-[#0a0a0a] border border-[#222222] flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 group-hover:border-white transition-all">
-                {scrim.team.logoUrl &&
-                (scrim.team.logoUrl.startsWith('http://') ||
-                  scrim.team.logoUrl.startsWith('https://') ||
-                  scrim.team.logoUrl.startsWith('/') ||
-                  scrim.team.logoUrl.startsWith('data:image/')) ? (
-                  <Image
-                    src={scrim.team.logoUrl}
-                    alt={scrim.team.name}
-                    width={48}
-                    height={48}
-                    className="object-cover w-full h-full"
-                    unoptimized
-                  />
-                ) : (
-                  <span className="font-mono font-black text-white text-xs">
-                    {scrim.team.tag}
-                  </span>
-                )}
+              <div
+                className={`relative w-12 h-12 rounded-lg bg-[#0a0a0a] border flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-all ${
+                  isProScrim ? 'border-amber-500/40 group-hover:border-amber-400' : 'border-[#222222] group-hover:border-white'
+                }`}
+              >
+                <TeamLogo
+                  logoUrl={scrim.team.logoUrl}
+                  name={scrim.team.name}
+                  tag={scrim.team.tag}
+                  size={48}
+                />
               </div>
             </Link>
 
@@ -121,6 +127,11 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
                 <span className="text-xs font-mono font-semibold text-[#a1a1aa]">
                   [{scrim.team.tag}]
                 </span>
+                {isProScrim && (
+                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    PRO
+                  </span>
+                )}
                 {scrim.team.avgElo && (
                   <FaceitBadge elo={scrim.team.avgElo} size="sm" />
                 )}
@@ -146,10 +157,17 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
             </div>
           </div>
 
-          {/* Format Badge */}
-          <Badge variant="cs" className="text-xs font-mono font-bold shrink-0">
-            {scrim.format}
-          </Badge>
+          {/* Format Badge & PRO indicator */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isProScrim && (
+              <span className="px-2 py-0.5 rounded bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black text-[10px] uppercase tracking-wider shadow-sm flex items-center gap-1">
+                ⭐ PRO
+              </span>
+            )}
+            <Badge variant="cs" className="text-xs font-mono font-bold shrink-0">
+              {scrim.format}
+            </Badge>
+          </div>
         </div>
 
         {/* Level, Platform and Server Info */}
@@ -243,7 +261,7 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
                     <span className="text-[10px] text-emerald-400 font-black">#{idx + 1}</span>
                   )}
                   <img
-                    src={`/maps/${map}.webp`}
+                    src={`/maps/${map}.webp?v=hd1`}
                     alt=""
                     className="w-4 h-2.5 rounded-[2px] object-cover"
                     onError={(e) => {
@@ -268,7 +286,7 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#121212] text-[#a1a1aa] border border-[#242424]"
                 >
                   <img
-                    src={`/maps/${map}.webp`}
+                    src={`/maps/${map}.webp?v=hd1`}
                     alt=""
                     className="w-4 h-2.5 rounded-[2px] object-cover grayscale opacity-60"
                     onError={(e) => {
@@ -311,4 +329,4 @@ export function ScrimCard({ scrim }: { scrim: ScrimCardData }) {
       </div>
     </Card>
   );
-}
+});

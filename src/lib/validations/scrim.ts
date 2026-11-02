@@ -38,8 +38,8 @@ export const scrimCreateSchema = z.object({
   excludedMaps: z
     .array(z.string())
     .refine(
-      (maps) => maps.filter((m) => m !== 'de_vertigo').length <= 3,
-      { message: 'Нельзя исключить более 3 карт из соревновательного пула Active Duty' }
+      (maps) => maps.filter((m) => m !== 'de_vertigo').length <= 2,
+      { message: 'Нельзя исключить более 2 карт из соревновательного пула Active Duty' }
     )
     .default([]),
   presetMaps: z

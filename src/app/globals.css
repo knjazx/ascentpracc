@@ -96,3 +96,20 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #333333;
 }
+
+/* Zero-lag hardware-accelerated tab switching (< 100ms, 0 reflow) */
+@keyframes tabFadeIn {
+  from {
+    opacity: 0.94;
+    transform: translate3d(0, 2px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-tab-fade {
+  animation: tabFadeIn 100ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}

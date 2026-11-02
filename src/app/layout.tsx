@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter, Montserrat } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { MainTabsProvider } from '@/context/MainTabsContext';
+import { AppTabsShell } from '@/components/layout/AppTabsShell';
 import { Header } from '@/components/header/Header';
 import { DataPrefetcher } from '@/components/providers/DataPrefetcher';
 
@@ -34,9 +36,13 @@ export default function RootLayout({
     <html lang="ru" className="dark">
       <body className={`${inter.variable} ${montserrat.variable} font-sans min-h-screen flex flex-col bg-background text-foreground`}>
         <AuthProvider>
-          <DataPrefetcher />
-          <Header />
-          <main className="flex-1 pb-16">{children}</main>
+          <MainTabsProvider>
+            <DataPrefetcher />
+            <Header />
+            <main className="flex-1 pb-16">
+              <AppTabsShell>{children}</AppTabsShell>
+            </main>
+          </MainTabsProvider>
         </AuthProvider>
       </body>
     </html>

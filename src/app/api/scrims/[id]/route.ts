@@ -122,6 +122,7 @@ export async function GET(
             logoUrl: true,
             noShowCount: true,
             avgElo: true,
+            isPro: true,
             stats: {
               select: { winRate: true, matchesPlayed: true },
             },
@@ -129,7 +130,7 @@ export async function GET(
         },
         slot: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ isPro: 'desc' }, { createdAt: 'desc' }],
     });
 
     const teamIds = rawResponses.map((r) => r.team.id);
@@ -148,14 +149,25 @@ export async function GET(
       const activeReports = reportsMap.get(r.team.id) || 0;
       const penalty = (r.team.noShowCount * 20) + (activeReports * 15);
       const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
+      const responseIsPro = Boolean(r.isPro || r.team.isPro);
       return {
         ...r,
+        isPro: responseIsPro,
         team: {
           ...r.team,
+          isPro: Boolean(r.team.isPro),
           trustFactor,
           activeReportsCount: activeReports,
         },
       };
+    });
+
+    // Ensure PRO responses are strictly sorted above non-PRO responses, then by createdAt desc
+    (responses as Array<{ isPro?: boolean; createdAt: string | Date }>).sort((a, b) => {
+      const aPro = a.isPro ? 1 : 0;
+      const bPro = b.isPro ? 1 : 0;
+      if (bPro !== aPro) return bPro - aPro;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   } else if (user) {
     // Check if user has teams that responded
@@ -181,6 +193,7 @@ export async function GET(
               logoUrl: true,
               noShowCount: true,
               avgElo: true,
+              isPro: true,
               stats: {
                 select: { winRate: true, matchesPlayed: true },
               },
@@ -188,15 +201,19 @@ export async function GET(
           },
           slot: true,
         },
+        orderBy: [{ isPro: 'desc' }, { createdAt: 'desc' }],
       });
 
       responses = rawUserResponses.map((r) => {
         const penalty = r.team.noShowCount * 20;
         const trustFactor = Math.max(0, Math.min(100, 100 - penalty));
+        const responseIsPro = Boolean(r.isPro || r.team.isPro);
         return {
           ...r,
+          isPro: responseIsPro,
           team: {
             ...r.team,
+            isPro: Boolean(r.team.isPro),
             trustFactor,
           },
         };

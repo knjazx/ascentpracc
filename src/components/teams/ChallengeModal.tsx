@@ -185,8 +185,8 @@ export function ChallengeModal({
         return;
       }
       const activeDutyExcluded = excludedMaps.filter((m) => m !== 'de_vertigo');
-      if (activeDutyExcluded.length >= 3) {
-        setError('Нельзя исключить более 3 карт из соревновательного пула Active Duty');
+      if (activeDutyExcluded.length >= 2) {
+        setError('Нельзя исключить более 2 карт из соревновательного пула Active Duty');
         return;
       }
       setError(null);
@@ -577,7 +577,7 @@ export function ChallengeModal({
                   <div className="space-y-3 pt-1 border-t border-[#1a1a1a]">
                     <div className="flex items-center justify-between text-[11px] text-[#a1a1aa]">
                       <span>
-                        Active Duty ({excludedMaps.filter((m) => m !== 'de_vertigo').length}/3 исключено):
+                        Active Duty ({excludedMaps.filter((m) => m !== 'de_vertigo').length}/2 исключено):
                       </span>
                       {excludedMaps.length > 0 && (
                         <button
@@ -626,7 +626,7 @@ export function ChallengeModal({
                     <div className="p-2 rounded-lg border border-purple-500/30 bg-purple-950/15 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <img
-                          src="/maps/de_vertigo.webp"
+                          src="/maps/de_vertigo.webp?v=hd1"
                           alt="Vertigo"
                           className="w-10 h-7 rounded object-cover border border-purple-500/30 shrink-0"
                         />

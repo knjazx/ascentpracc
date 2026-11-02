@@ -179,7 +179,7 @@ export default function AdminMapsPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-14 h-9 rounded-md overflow-hidden bg-black/60 border border-white/10 shrink-0">
                     <img
-                      src={`/maps/${map.map}.webp`}
+                      src={`/maps/${map.map}.webp?v=hd1`}
                       alt={map.displayName}
                       className="w-full h-full object-cover"
                       onError={(e) => {

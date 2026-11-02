@@ -6,12 +6,20 @@ import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Swords, Clock, Calendar } from 'lucide-react';
 import { formatUtcToLocal } from '@/lib/date';
+import { TeamLogo } from '@/components/ui/TeamLogo';
 
 interface TeamSummary {
   id: string;
   name: string;
   tag: string;
   logoUrl: string | null;
+  avgElo?: number | null;
+  stats?: {
+    winRate: number;
+    matchesPlayed: number;
+    wins: number;
+    losses: number;
+  } | null;
 }
 
 interface MatchHeaderProps {
@@ -109,20 +117,12 @@ export function MatchHeader({
         {/* Team A (Host) */}
         <div className="flex items-center gap-3 sm:gap-4 flex-1">
           <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-cs-panel border border-border flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-            {teamA.logoUrl ? (
-              <Image
-                src={teamA.logoUrl}
-                alt={teamA.name}
-                width={64}
-                height={64}
-                className="object-cover w-full h-full"
-                unoptimized
-              />
-            ) : (
-              <span className="font-mono font-black text-white text-lg">
-                {teamA.tag}
-              </span>
-            )}
+            <TeamLogo
+              logoUrl={teamA.logoUrl}
+              name={teamA.name}
+              tag={teamA.tag}
+              size={64}
+            />
           </div>
 
           <div className="overflow-hidden">
@@ -132,11 +132,30 @@ export function MatchHeader({
             >
               {teamA.name}
             </Link>
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
               <span className="text-xs font-mono font-bold text-neutral-400">[{teamA.tag}]</span>
               <span className="text-[10px] uppercase font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-cs-panel border border-border">
                 Организатор
               </span>
+              {typeof teamA.stats?.winRate === 'number' && (
+                <span
+                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/5 border border-white/10 ${
+                    teamA.stats.winRate > 0.5
+                      ? 'text-emerald-400'
+                      : teamA.stats.winRate === 0.5
+                      ? 'text-neutral-300'
+                      : 'text-rose-400'
+                  }`}
+                  title={`${teamA.stats.wins} побед, ${teamA.stats.losses} поражений (${teamA.stats.matchesPlayed} матчей)`}
+                >
+                  WR: {Math.round(teamA.stats.winRate * 100)}%
+                </span>
+              )}
+              {teamA.avgElo && (
+                <span className="text-[10px] font-mono font-bold text-yellow-400 px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20">
+                  {teamA.avgElo} ELO
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -160,7 +179,26 @@ export function MatchHeader({
             >
               {teamB.name}
             </Link>
-            <div className="flex items-center justify-end gap-1.5 mt-0.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5 mt-0.5">
+              {teamB.avgElo && (
+                <span className="text-[10px] font-mono font-bold text-yellow-400 px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20">
+                  {teamB.avgElo} ELO
+                </span>
+              )}
+              {typeof teamB.stats?.winRate === 'number' && (
+                <span
+                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/5 border border-white/10 ${
+                    teamB.stats.winRate > 0.5
+                      ? 'text-emerald-400'
+                      : teamB.stats.winRate === 0.5
+                      ? 'text-neutral-300'
+                      : 'text-rose-400'
+                  }`}
+                  title={`${teamB.stats.wins} побед, ${teamB.stats.losses} поражений (${teamB.stats.matchesPlayed} матчей)`}
+                >
+                  WR: {Math.round(teamB.stats.winRate * 100)}%
+                </span>
+              )}
               <span className="text-[10px] uppercase font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-cs-panel border border-border">
                 Соперник
               </span>
@@ -169,20 +207,12 @@ export function MatchHeader({
           </div>
 
           <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-cs-panel border border-border flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-            {teamB.logoUrl ? (
-              <Image
-                src={teamB.logoUrl}
-                alt={teamB.name}
-                width={64}
-                height={64}
-                className="object-cover w-full h-full"
-                unoptimized
-              />
-            ) : (
-              <span className="font-mono font-black text-white text-lg">
-                {teamB.tag}
-              </span>
-            )}
+            <TeamLogo
+              logoUrl={teamB.logoUrl}
+              name={teamB.name}
+              tag={teamB.tag}
+              size={64}
+            />
           </div>
         </div>
       </div>

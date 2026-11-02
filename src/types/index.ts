@@ -44,6 +44,10 @@ export interface SafeUser {
   role: Role;
   banned: boolean;
   onboarded: boolean;
+  isPro?: boolean;
+  proExpiresAt?: string | null;
+  ascentCoins?: number;
+  discordWebhookUrl?: string | null;
   createdAt: string;
 }
 

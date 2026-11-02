@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { UserMenu } from '@/components/header/UserMenu';
+import { ActiveMatchBanner } from '@/components/header/ActiveMatchBanner';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/hooks/useUser';
 import {
@@ -17,12 +18,20 @@ import {
   Menu,
   X,
   Flame,
+  Sparkles,
 } from 'lucide-react';
+import { useMainTabs, MAIN_TAB_PATHS } from '@/context/MainTabsContext';
 
 export function Header() {
   const pathname = usePathname();
   const { user } = useUser();
+  const { activeTab, switchTab, prefetchTab, isMainTab } = useMainTabs();
+  const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const navLinks = [
     { href: '/', label: 'Праки', icon: Crosshair },
@@ -31,136 +40,175 @@ export function Header() {
     { href: '/leaderboard', label: 'Лидерборд', icon: Trophy },
   ];
 
+  const isMainTabPath = (path: string) =>
+    (MAIN_TAB_PATHS as readonly string[]).includes(path);
+
   const isActive = (path: string) => {
+    if (isMainTab) {
+      return activeTab === path;
+    }
     if (path === '/') return pathname === '/';
     return pathname.startsWith(path);
   };
 
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (isMainTabPath(href)) {
+      e.preventDefault();
+      switchTab(href);
+      setMobileMenuOpen(false);
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[#222222] bg-[#0a0a0a]/95 backdrop-blur-md">
-      <div className="container flex h-16 items-center justify-between gap-4">
-        {/* Brand / Logo */}
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative flex items-center justify-center w-8 h-8 shrink-0 transition-transform duration-300 group-hover:scale-110">
-              <Image
-                src="/images/ascent-icon.png"
-                alt="Ascent Pracc"
-                width={32}
-                height={32}
-                className="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(255,255,255,0.25)] group-hover:drop-shadow-[0_0_16px_rgba(255,255,255,0.5)] transition-all"
-                priority
-              />
-            </div>
-            <span className="font-black text-lg tracking-wider uppercase text-white font-mono">
-              ASCENT<span className="text-[#a1a1aa]">.PRACC</span>
-            </span>
-          </Link>
+    <>
+      <header className="sticky top-0 z-40 w-full border-b border-[#222222] bg-[#0a0a0a]/95 backdrop-blur-md">
+        <div className="container flex h-16 items-center justify-between gap-4">
+          {/* Brand / Logo */}
+          <div className="flex items-center gap-6">
+            <Link
+              href="/"
+              onClick={(e) => handleNavClick(e, '/')}
+              onMouseEnter={() => prefetchTab('/')}
+              className="flex items-center gap-3 group"
+            >
+              <div className="relative flex items-center justify-center w-8 h-8 shrink-0 transition-transform duration-300 group-hover:scale-110">
+                <Image
+                  src="/images/ascent-icon.png"
+                  alt="Ascent Pracc"
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(255,255,255,0.25)] group-hover:drop-shadow-[0_0_16px_rgba(255,255,255,0.5)] transition-all"
+                  priority
+                />
+              </div>
+              <span className="font-black text-lg tracking-wider uppercase text-white font-mono">
+                ASCENT<span className="text-[#a1a1aa]">.PRACC</span>
+              </span>
+            </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              return (
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-1">
+              {navLinks.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={true}
+                    onClick={(e) => handleNavClick(e, item.href)}
+                    onMouseEnter={() => prefetchTab(item.href)}
+                    onTouchStart={() => prefetchTab(item.href)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      active
+                        ? 'bg-white text-black font-bold shadow-sm'
+                        : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${active ? 'text-black' : 'text-[#a1a1aa]'}`} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Right Action Bar */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {mounted && user && (
+              <>
+                {/* PRO Status / Subscription Link */}
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch={true}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    active
-                      ? 'bg-white text-black font-bold shadow-sm'
-                      : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
+                  href="/subscription"
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all text-xs font-mono ${
+                    user.isPro
+                      ? 'bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border-amber-500/40 text-amber-400 hover:border-amber-400 font-black'
+                      : 'bg-[#141414] border-[#2a2a2a] text-neutral-400 hover:border-amber-500/40 hover:text-amber-300'
                   }`}
+                  title={user.isPro ? 'Статус PRO активен. Нажмите для управления подпиской' : 'Перейти к подписке PRO'}
                 >
-                  <Icon className={`w-4 h-4 ${active ? 'text-black' : 'text-[#a1a1aa]'}`} />
-                  <span>{item.label}</span>
+                  <Sparkles className={`w-3.5 h-3.5 ${user.isPro ? 'text-amber-400' : 'text-amber-500/70'}`} />
+                  <span>PRO</span>
                 </Link>
-              );
-            })}
-          </nav>
-        </div>
 
-        {/* Right Action Bar */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {user && (
-            <>
-              {/* Notification bell */}
-              <Link href="/notifications">
-                <button
-                  aria-label="Уведомления"
-                  className="relative p-2 rounded-lg text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-                >
-                  <Bell className="w-5 h-5" />
-                  {user.unreadNotifications > 0 && (
-                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-black ring-2 ring-[#0a0a0a]">
-                      {user.unreadNotifications > 9 ? '9+' : user.unreadNotifications}
-                    </span>
-                  )}
-                </button>
-              </Link>
-
-              {/* Create Scrim Fast Action */}
-              <Link href="/scrims/new" className="hidden sm:inline-flex">
-                <Button variant="cs" size="sm" className="gap-1.5 text-xs font-bold tracking-wider">
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>Создать заявку</span>
-                </Button>
-              </Link>
-            </>
-          )}
-
-          {/* User Menu / Steam Login */}
-          <UserMenu />
-
-          {/* Mobile hamburger menu toggle */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a] transition-colors"
-            aria-label="Меню"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-[#222222] bg-[#0a0a0a] px-4 py-3 space-y-2 animate-in slide-in-from-top-2 shadow-2xl">
-          <nav className="flex flex-col gap-1">
-            {navLinks.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? 'bg-white text-black font-bold'
-                      : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${active ? 'text-black' : ''}`} />
-                  <span>{item.label}</span>
+                {/* Notification bell */}
+                <Link href="/notifications">
+                  <button
+                    aria-label="Уведомления"
+                    className="relative p-2 rounded-lg text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {user.unreadNotifications > 0 && (
+                      <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-black ring-2 ring-[#0a0a0a]">
+                        {user.unreadNotifications > 9 ? '9+' : user.unreadNotifications}
+                      </span>
+                    )}
+                  </button>
                 </Link>
-              );
-            })}
 
-            {user && (
-              <Link
-                href="/scrims/new"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-lg bg-white text-black font-bold uppercase tracking-wider text-xs shadow-md"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Создать заявку на прак</span>
-              </Link>
+                {/* Create Scrim Fast Action */}
+                <Link href="/scrims/new" className="hidden sm:inline-flex">
+                  <Button variant="cs" size="sm" className="gap-1.5 text-xs font-bold tracking-wider">
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>Создать заявку</span>
+                  </Button>
+                </Link>
+              </>
             )}
-          </nav>
+
+            {/* User Menu / Steam Login */}
+            <UserMenu />
+
+            {/* Mobile hamburger menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a] transition-colors"
+              aria-label="Меню"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
-      )}
-    </header>
+
+        {/* Mobile Drawer Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-[#222222] bg-[#0a0a0a] px-4 py-3 space-y-2 animate-in slide-in-from-top-2 shadow-2xl">
+            <nav className="flex flex-col gap-1">
+              {navLinks.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={(e) => handleNavClick(e, item.href)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      active
+                        ? 'bg-white text-black font-bold'
+                        : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${active ? 'text-black' : ''}`} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+
+              {mounted && user && (
+                <Link
+                  href="/scrims/new"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-lg bg-white text-black font-bold uppercase tracking-wider text-xs shadow-md"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Создать заявку на прак</span>
+                </Link>
+              )}
+            </nav>
+          </div>
+        )}
+      </header>
+      <ActiveMatchBanner />
+    </>
   );
 }

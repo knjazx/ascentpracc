@@ -31,7 +31,9 @@ import {
   Quote,
   MapPin,
   Info,
+  Sparkles,
 } from 'lucide-react';
+import { TeamLogo } from '@/components/ui/TeamLogo';
 import { FaceitBadge } from '@/components/ui/FaceitBadge';
 import { ACTIVE_DUTY_MAPS, EXPANDED_POOL_MAPS, ALL_MAPS } from '@/lib/constants/maps';
 import { SERVER_LOCATION_MAP } from '@/lib/constants/servers';
@@ -85,6 +87,7 @@ interface ScrimDetail {
     proposedAt: string | null;
     message: string | null;
     disableVertigo?: boolean;
+    isPro?: boolean;
     status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN';
     createdAt: string;
     team: {
@@ -94,6 +97,7 @@ interface ScrimDetail {
       logoUrl: string | null;
       noShowCount: number;
       avgElo?: number | null;
+      isPro?: boolean;
       trustFactor?: number;
       activeReportsCount?: number;
       stats?: { winRate: number; matchesPlayed: number } | null;
@@ -371,6 +375,21 @@ export default function ScrimDetailPage() {
   const isChallenge = Boolean(scrim.targetTeam);
   const userResponses = scrim.responses || [];
   const hasPendingResponse = responseSent || userResponses.length > 0;
+
+  const sortedResponses = React.useMemo(() => {
+    if (!scrim?.responses) return [];
+    return [...scrim.responses].sort((a, b) => {
+      const aPro = Boolean(a.isPro || a.team?.isPro);
+      const bPro = Boolean(b.isPro || b.team?.isPro);
+      if (aPro !== bPro) return bPro ? 1 : -1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [scrim?.responses]);
+
+  const isUserPro = Boolean(
+    (user?.isPro && (!user?.proExpiresAt || new Date(user.proExpiresAt).getTime() > Date.now())) ||
+    user?.teams?.some((t) => t.id === selectedTeamId && (t as { isPro?: boolean }).isPro)
+  );
 
   const statusBadges = {
     OPEN: (
@@ -696,7 +715,7 @@ export default function ScrimDetailPage() {
                   const mapInfo = ALL_MAPS.find((m) => m.id === mapId) || {
                     id: mapId,
                     name: mapId.replace('de_', '').toUpperCase(),
-                    image: `/maps/${mapId}.webp`,
+                    image: `/maps/${mapId}.webp?v=hd1`,
                     pool: 'ACTIVE_DUTY' as const,
                   };
                   const isDecider = index === scrim.presetMaps!.length - 1 && scrim.presetMaps!.length > 1;
@@ -962,14 +981,15 @@ export default function ScrimDetailPage() {
             )}
           </div>
 
-          {scrim.responses.length === 0 ? (
+          {sortedResponses.length === 0 ? (
             <div className="p-8 text-center rounded-2xl border border-[#222222] bg-[#111111] shadow-xl text-[#a1a1aa] text-sm font-mono">
               Пока нет откликов от соперников. Ссылка на заявку активна в ленте.
             </div>
           ) : (
             <div className="space-y-3.5">
-              {scrim.responses.map((resp) => {
+              {sortedResponses.map((resp) => {
                 const isPending = resp.status === 'PENDING';
+                const isProResp = Boolean(resp.isPro || resp.team.isPro);
                 let slotInfo = 'Любое предложенное время';
                 if (resp.slot) {
                   const { dateStr, timeStr } = formatSlotDateTime(resp.slot.startsAt, userTimezone);
@@ -990,33 +1010,38 @@ export default function ScrimDetailPage() {
                 return (
                   <div
                     key={resp.id}
-                    className="relative p-5 rounded-2xl border border-[#262626] bg-gradient-to-r from-[#141414] via-[#111111] to-[#0e0e0e] shadow-xl hover:border-white/30 transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-5 group"
+                    className={`relative p-5 rounded-2xl border transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-5 group ${
+                      isProResp
+                        ? 'border-amber-500/40 bg-gradient-to-r from-[#1c1608] via-[#13110b] to-[#0e0e0e] shadow-xl shadow-amber-950/20 hover:border-amber-400/60 ring-1 ring-amber-500/20'
+                        : 'border-[#262626] bg-gradient-to-r from-[#141414] via-[#111111] to-[#0e0e0e] shadow-xl hover:border-white/30'
+                    }`}
                   >
+                    {/* Top PRO ribbon if priority */}
+                    {isProResp && (
+                      <div className="absolute -top-2.5 left-6 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black font-mono text-[9px] uppercase tracking-wider shadow-md">
+                        <Sparkles className="w-2.5 h-2.5 fill-black stroke-black" />
+                        <span>⭐ PRO Отклик • Вверху списка</span>
+                      </div>
+                    )}
+
                     {/* Responding Team info */}
                     <div className="flex items-start sm:items-center gap-4 min-w-0">
                       {/* Logo Box */}
                       <Link href={`/teams/${resp.team.id}`} className="shrink-0 group/logo">
                         <div className="relative w-14 h-14 rounded-xl bg-[#0a0a0a] border border-[#2a2a2a] flex items-center justify-center overflow-hidden shadow-md group-hover/logo:border-white/50 transition-all">
-                          {resp.team.logoUrl ? (
-                            <Image
-                              src={resp.team.logoUrl}
-                              alt={resp.team.name}
-                              width={56}
-                              height={56}
-                              className="object-cover w-full h-full group-hover/logo:scale-105 transition-transform"
-                              unoptimized
-                            />
-                          ) : (
-                            <span className="font-mono text-sm font-black text-white">
-                              {resp.team.tag}
-                            </span>
-                          )}
+                          <TeamLogo
+                            logoUrl={resp.team.logoUrl}
+                            name={resp.team.name}
+                            tag={resp.team.tag}
+                            size={56}
+                            className="w-14 h-14 group-hover/logo:scale-105 transition-transform"
+                          />
                         </div>
                       </Link>
 
                       {/* Team details */}
                       <div className="space-y-1.5 min-w-0">
-                        {/* Row 1: Name, Tag, Faceit Badge, Trust Factor */}
+                        {/* Row 1: Name, Tag, Faceit Badge, Trust Factor, PRO */}
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
                             href={`/teams/${resp.team.id}`}
@@ -1027,6 +1052,13 @@ export default function ScrimDetailPage() {
                           <span className="text-xs font-mono font-bold text-[#a1a1aa] bg-[#1a1a1a] px-2 py-0.5 rounded-md border border-[#2a2a2a]">
                             [{resp.team.tag}]
                           </span>
+
+                          {isProResp && (
+                            <span className="inline-flex items-center gap-1 font-mono font-black text-[10px] uppercase tracking-wider text-amber-300 bg-amber-500/10 border border-amber-500/40 px-2 py-0.5 rounded">
+                              <Sparkles className="w-3 h-3 text-amber-400" />
+                              <span>PRO</span>
+                            </span>
+                          )}
 
                           {/* Faceit Level Icon & AVG ELO Badge */}
                           <FaceitBadge elo={resp.team.avgElo} size="sm" />
@@ -1349,6 +1381,23 @@ export default function ScrimDetailPage() {
                       ))}
                     </select>
                   </div>
+
+                  {/* PRO Priority application info banner */}
+                  {isUserPro ? (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2.5 text-xs text-amber-300 font-mono shadow-sm shadow-amber-950/20">
+                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        ⭐ <strong>Приоритет PRO активен</strong>: ваша заявка будет закреплена в самом верху списка у организатора прака!
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-center justify-between gap-2 text-[11px] text-neutral-400 font-mono">
+                      <span>💡 С подпиской PRO ваша заявка отображается выше остальных в списке.</span>
+                      <Link href="/subscription" className="text-amber-400 hover:underline font-bold shrink-0">
+                        Подробнее
+                      </Link>
+                    </div>
+                  )}
 
                   {/* Slot choice */}
                   <div className="space-y-2">

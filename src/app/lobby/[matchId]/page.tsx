@@ -34,12 +34,26 @@ interface MatchLobbyData {
     name: string;
     tag: string;
     logoUrl: string | null;
+    avgElo?: number | null;
+    stats?: {
+      winRate: number;
+      matchesPlayed: number;
+      wins: number;
+      losses: number;
+    } | null;
   };
   teamB: {
     id: string;
     name: string;
     tag: string;
     logoUrl: string | null;
+    avgElo?: number | null;
+    stats?: {
+      winRate: number;
+      matchesPlayed: number;
+      wins: number;
+      losses: number;
+    } | null;
   };
   request?: {
     serverBy: 'HOST' | 'GUEST' | 'NEGOTIABLE';

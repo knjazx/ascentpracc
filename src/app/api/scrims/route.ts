@@ -122,7 +122,10 @@ export async function GET(request: NextRequest) {
           select: { responses: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { isPro: 'desc' },
+        { createdAt: 'desc' },
+      ],
     }),
   ]);
 
@@ -184,7 +187,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Check open requests limit (strictly max 1 open scrim per team)
+    // 2. Determine PRO status of author/team
+    const teamRecord = await prisma.team.findUnique({
+      where: { id: validated.teamId },
+      select: { id: true, isPro: true },
+    });
+    const isPro = Boolean(
+      (user.isPro && (!user.proExpiresAt || new Date(user.proExpiresAt).getTime() > Date.now())) ||
+      teamRecord?.isPro
+    );
+
+    // Validate PRO constraints
+    // Slots: Free max 2, PRO max 3
+    const maxSlots = isPro ? 3 : 2;
+    if (validated.slots.length > maxSlots) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: isPro
+            ? 'Максимум 3 предложения по времени'
+            : 'В бесплатном тарифе можно указать максимум 2 слота времени. Подключите PRO для 3 слотов.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Servers: Free requires exactly 4 servers, PRO allows 1 to 4
+    if (!isPro && validated.serverLocations.length !== 4) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `В бесплатном тарифе необходимо выбрать ровно 4 сервера (выбрано: ${validated.serverLocations.length}/4). С PRO можно выбрать от 1 до 4.`,
+        },
+        { status: 400 }
+      );
+    }
+    if (isPro && (validated.serverLocations.length < 1 || validated.serverLocations.length > 4)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'С подпиской PRO необходимо выбрать от 1 до 4 серверов.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Excluded maps: Free cannot exclude maps (0), PRO can exclude up to 2 maps
+    if (!isPro && validated.excludedMaps.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Исключение карт доступно только с подпиской PRO. В бесплатном тарифе играются все карты соревновательного пула.',
+        },
+        { status: 400 }
+      );
+    }
+    if (isPro && validated.excludedMaps.length > 2) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'С подпиской PRO можно исключить максимум 2 карты.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. Check open requests limit (strictly max 1 open scrim per team)
     const existingOpenScrim = await prisma.scrimRequest.findFirst({
       where: {
         teamId: validated.teamId,
@@ -261,6 +329,7 @@ export async function POST(request: NextRequest) {
           excludedMaps: validated.excludedMaps,
           presetMaps: validated.presetMaps || [],
           comment: validated.comment || null,
+          isPro,
           expiresAt,
           slots: {
             create: validated.slots.map((s) => ({

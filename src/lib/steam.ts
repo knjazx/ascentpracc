@@ -39,25 +39,64 @@ export async function fetchSteamUserProfile(
   }
 
   // 2. Direct Steam Community XML Feed Fallback (reliable, no API key required)
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const communityXmlUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
+      const res = await fetch(communityXmlUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/xml, application/xml, text/plain',
+        },
+        next: { revalidate: 0 },
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (res.ok) {
+        const xml = await res.text();
+        const nickMatch =
+          xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/i) ||
+          xml.match(/<steamID>(.*?)<\/steamID>/i);
+        const avatarMatch =
+          xml.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/i) ||
+          xml.match(/<avatarFull>(.*?)<\/avatarFull>/i) ||
+          xml.match(/<avatarMedium><!\[CDATA\[(.*?)\]\]><\/avatarMedium>/i) ||
+          xml.match(/<avatarMedium>(.*?)<\/avatarMedium>/i);
+
+        if (nickMatch && nickMatch[1]?.trim()) {
+          nickname = nickMatch[1].trim();
+        }
+        if (avatarMatch && avatarMatch[1]?.trim()) {
+          avatarUrl = avatarMatch[1].trim();
+        }
+
+        if (nickname !== `Player_${steamId.slice(-6)}`) {
+          return { nickname, avatarUrl };
+        }
+      }
+    } catch (err) {
+      console.warn(`[Steam Community] XML fetch attempt ${attempt} failed:`, err);
+    }
+  }
+
+  // 3. HTML Profile Scraping Fallback
   try {
-    const communityXmlUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
-    const res = await fetch(communityXmlUrl, {
+    const htmlUrl = `https://steamcommunity.com/profiles/${steamId}`;
+    const res = await fetch(htmlUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/xml, application/xml, text/plain',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
       next: { revalidate: 0 },
-      signal: AbortSignal.timeout(2500),
+      signal: AbortSignal.timeout(5000),
     });
 
     if (res.ok) {
-      const xml = await res.text();
-      const nickMatch =
-        xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/i) ||
-        xml.match(/<steamID>(.*?)<\/steamID>/i);
+      const html = await res.text();
+      const nickMatch = html.match(/<span class="actual_personaname">([^<]+)<\/span>/i);
       const avatarMatch =
-        xml.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/i) ||
-        xml.match(/<avatarFull>(.*?)<\/avatarFull>/i);
+        html.match(/<div class="playerAvatarAutoSizeInner">[\s\S]*?<img src="([^"]+)"/i) ||
+        html.match(/<div class="playerAvatar">[\s\S]*?<img src="([^"]+)"/i);
 
       if (nickMatch && nickMatch[1]?.trim()) {
         nickname = nickMatch[1].trim();
@@ -67,7 +106,7 @@ export async function fetchSteamUserProfile(
       }
     }
   } catch (err) {
-    console.warn('[Steam Community] XML fallback fetch error:', err);
+    console.warn('[Steam Community] HTML scrape fallback failed:', err);
   }
 
   return { nickname, avatarUrl };

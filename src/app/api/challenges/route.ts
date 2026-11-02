@@ -131,6 +131,32 @@ export async function POST(request: NextRequest) {
       ? challengerManager.team
       : await prisma.team.findUniqueOrThrow({ where: { id: challengerTeamId } });
 
+    const challengerIsPro = Boolean(
+      (user.isPro && (!user.proExpiresAt || new Date(user.proExpiresAt).getTime() > Date.now())) ||
+      challengerTeam.isPro
+    );
+
+    if (!challengerIsPro && parsedSlots.length > 2) {
+      return NextResponse.json(
+        { success: false, error: 'В бесплатном тарифе можно предложить максимум 2 слота времени' },
+        { status: 400 }
+      );
+    }
+
+    if (!challengerIsPro && Array.isArray(excludedMaps) && excludedMaps.length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Исключение карт доступно только с подпиской PRO' },
+        { status: 400 }
+      );
+    }
+
+    if (challengerIsPro && Array.isArray(excludedMaps) && excludedMaps.filter((m: string) => m !== 'de_vertigo').length > 2) {
+      return NextResponse.json(
+        { success: false, error: 'С подпиской PRO можно исключить максимум 2 карты из Active Duty' },
+        { status: 400 }
+      );
+    }
+
     const challenge = await prisma.$transaction(async (tx) => {
       const scrim = await tx.scrimRequest.create({
         data: {
@@ -141,6 +167,7 @@ export async function POST(request: NextRequest) {
           serverLocations: Array.isArray(serverLocations) ? serverLocations : [],
           presetMaps: Array.isArray(presetMaps) ? presetMaps : [],
           excludedMaps: Array.isArray(excludedMaps) ? excludedMaps : [],
+          isPro: challengerIsPro,
           level: `CHALLENGE:${targetTeamId}`,
           comment: comment ? String(comment).trim().slice(0, 500) : null,
           status: ScrimStatus.OPEN,

@@ -92,6 +92,10 @@ model User {
   role        Role     @default(USER)
   banned      Boolean  @default(false)
   onboarded   Boolean  @default(false)
+  isPro       Boolean  @default(false)
+  proExpiresAt DateTime?
+  ascentCoins  Int      @default(1000)
+  discordWebhookUrl String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -100,6 +104,7 @@ model User {
   auditLogs       AuditLog[]
   reportsMade     Report[]        @relation("UserReports")
   notifications   Notification[]
+  codeActivations CodeActivation[]
 
   @@index([steamId])
   @@index([role])
@@ -115,6 +120,8 @@ model Team {
   discordInvite String?
   avgElo        Int?
   noShowCount   Int      @default(0)
+  isPro         Boolean  @default(false)
+  discordWebhookUrl String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -161,6 +168,7 @@ model ScrimRequest {
   presetMaps      String[]    @default([])
   comment      String?
   status       ScrimStatus @default(OPEN)
+  isPro        Boolean     @default(false)
   expiresAt    DateTime
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -172,6 +180,7 @@ model ScrimRequest {
 
   @@index([status, expiresAt])
   @@index([teamId])
+  @@index([isPro, createdAt])
   @@index([createdAt])
 }
 
@@ -196,6 +205,7 @@ model ScrimResponse {
   proposedAt     DateTime?
   message        String?
   disableVertigo Boolean        @default(false)
+  isPro          Boolean        @default(false)
   status         ResponseStatus @default(PENDING)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -207,6 +217,7 @@ model ScrimResponse {
   @@index([requestId, status])
   @@index([teamId])
   @@index([createdAt])
+  @@index([isPro, createdAt])
 }
 
 model Match {
@@ -415,4 +426,34 @@ model TeamBlacklist {
 
   @@unique([teamId, blockedTeamId])
   @@index([teamId])
+}
+
+model ActivationCode {
+  id           String           @id @default(cuid())
+  code         String           @unique
+  description  String?
+  durationDays Int              @default(30)
+  maxUses      Int              @default(1)
+  usedCount    Int              @default(0)
+  expiresAt    DateTime?
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  activations  CodeActivation[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model CodeActivation {
+  id          String   @id @default(cuid())
+  codeId      String
+  userId      String
+  activatedAt DateTime @default(now())
+
+  code ActivationCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([codeId, userId])
+  @@index([userId])
+  @@index([codeId])
 }

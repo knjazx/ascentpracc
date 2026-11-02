@@ -26,17 +26,37 @@ export async function GET() {
       );
     }
 
-    const cacheKey = `user:me:${user.id}`;
-    const cached = memoryCache.get(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached, { headers: NO_CACHE_HEADERS });
+    let activeUser = user;
+    if (
+      activeUser.nickname?.startsWith('Player_') ||
+      activeUser.avatarUrl?.includes('fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb')
+    ) {
+      try {
+        const { fetchSteamUserProfile } = await import('@/lib/steam');
+        const steamData = await fetchSteamUserProfile(activeUser.steamId, process.env.STEAM_API_KEY);
+        if (steamData.nickname && !steamData.nickname.startsWith('Player_')) {
+          const updated = await prisma.user.update({
+            where: { id: activeUser.id },
+            data: { nickname: steamData.nickname, avatarUrl: steamData.avatarUrl },
+          });
+          activeUser = toSafeUser(updated);
+        }
+      } catch (syncErr) {
+        console.warn('[API /me] Auto-sync steam failed:', syncErr);
+      }
     }
 
-    const activeUser = user;
-
-    // Safely query unread notifications count and user's managed teams
+    // Safely query unread notifications count, managed teams, and any active matches
     let unreadNotifications = 0;
     let managedTeams: { team: { id: string; name: string; tag: string; logoUrl: string | null }; isOwner: boolean }[] = [];
+    let activeMatch: {
+      id: string;
+      format: string;
+      status: string;
+      scheduledAt: string;
+      teamA: { id: string; name: string; tag: string };
+      teamB: { id: string; name: string; tag: string };
+    } | null = null;
 
     try {
       const [notifs, teams] = await Promise.all([
@@ -55,6 +75,8 @@ export async function GET() {
                 name: true,
                 tag: true,
                 logoUrl: true,
+                isPro: true,
+                discordWebhookUrl: true,
               },
             },
           },
@@ -62,6 +84,35 @@ export async function GET() {
       ]);
       unreadNotifications = notifs;
       managedTeams = teams;
+
+      const teamIds = managedTeams.map((t) => t.team.id);
+      if (teamIds.length > 0) {
+        const foundMatch = await prisma.match.findFirst({
+          where: {
+            status: { in: ['SCHEDULED', 'VETO', 'LIVE', 'AWAITING_RESULT'] },
+            OR: [
+              { teamAId: { in: teamIds } },
+              { teamBId: { in: teamIds } },
+            ],
+          },
+          select: {
+            id: true,
+            format: true,
+            status: true,
+            scheduledAt: true,
+            teamA: { select: { id: true, name: true, tag: true, logoUrl: true } },
+            teamB: { select: { id: true, name: true, tag: true, logoUrl: true } },
+          },
+          orderBy: { scheduledAt: 'desc' },
+        });
+
+        if (foundMatch) {
+          activeMatch = {
+            ...foundMatch,
+            scheduledAt: foundMatch.scheduledAt.toISOString(),
+          };
+        }
+      }
     } catch (dbErr) {
       console.warn('[API /me] Could not load supplementary notifications/teams data:', dbErr);
     }
@@ -75,10 +126,9 @@ export async function GET() {
           ...tm.team,
           isOwner: tm.isOwner,
         })),
+        activeMatch,
       },
     };
-
-    memoryCache.set(cacheKey, payload, 60);
 
     return NextResponse.json(payload, { headers: NO_CACHE_HEADERS });
   } catch (err: unknown) {
@@ -103,7 +153,13 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const validated = updateProfileSchema.parse(body);
 
-    const updateData: { timezone?: string; discordTag?: string | null; discordId?: string | null; onboarded?: boolean } = {};
+    const updateData: {
+      timezone?: string;
+      discordTag?: string | null;
+      discordId?: string | null;
+      discordWebhookUrl?: string | null;
+      onboarded?: boolean;
+    } = {};
 
     updateData.timezone = validated.timezone || 'SYSTEM';
     updateData.onboarded = true;
@@ -114,6 +170,19 @@ export async function PATCH(request: NextRequest) {
 
     if (validated.discordId !== undefined) {
       updateData.discordId = validated.discordId ? validated.discordId.trim() : null;
+    }
+
+    if (validated.discordWebhookUrl !== undefined) {
+      const isProUser = Boolean(
+        currentUser.isPro && (!currentUser.proExpiresAt || new Date(currentUser.proExpiresAt).getTime() > Date.now())
+      );
+      if (validated.discordWebhookUrl && !isProUser) {
+        return NextResponse.json(
+          { success: false, error: 'Привязка Discord Webhook доступна только для пользователей с подпиской PRO' },
+          { status: 403 }
+        );
+      }
+      updateData.discordWebhookUrl = validated.discordWebhookUrl ? validated.discordWebhookUrl.trim() : null;
     }
 
     const updatedUser = await prisma.user.update({

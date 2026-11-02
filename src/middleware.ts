@@ -3,6 +3,7 @@ import { jwtVerify } from 'jose';
 
 const DEFAULT_JWT_SECRET = 'super_secret_jwt_key_cs2_scrim_league_at_least_32_chars_long';
 const AUTH_COOKIE_NAME = 'cs2_session';
+const ADMIN_COOKIE_NAME = 'ascent_admin_token';
 
 interface TokenPayload {
   userId: string;
@@ -68,6 +69,17 @@ async function verifySessionToken(token: string): Promise<TokenPayload | null> {
   }
 }
 
+async function verifyAdminCookieToken(token: string): Promise<boolean> {
+  const primarySecret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+  try {
+    const key = new TextEncoder().encode(primarySecret);
+    const { payload } = await jwtVerify(token, key, { algorithms: ['HS256'] });
+    return Boolean(payload?.isAdmin);
+  } catch {
+    return false;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -89,6 +101,11 @@ export async function middleware(request: NextRequest) {
   if (token) {
     session = await verifySessionToken(token);
   }
+
+  // Check admin token
+  const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  const isAdminCookie = adminToken ? await verifyAdminCookieToken(adminToken) : false;
+  const isAdminUser = isAdminCookie || session?.role === 'ADMIN';
 
   // 1. If banned, enforce /banned page
   if (session?.banned && pathname !== '/banned') {
@@ -114,14 +131,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(getSafeRedirectUrl('/', request));
   }
 
-  // 5. Protected routes requiring authentication
+  // 5. Admin routes check: /admin and subroutes
+  if (pathname.startsWith('/admin')) {
+    if (!isAdminUser) {
+      // Allow visiting /admin or /admin/login so the admin login form can render
+      if (pathname === '/admin' || pathname === '/admin/login') {
+        return NextResponse.next();
+      }
+      // Subroutes (/admin/disputes, etc.) redirect to /admin to login
+      return NextResponse.redirect(getSafeRedirectUrl('/admin', request));
+    }
+    return NextResponse.next();
+  }
+
+  // 6. Protected routes requiring authentication
   const protectedRoutes = [
     '/onboarding',
     '/settings',
     '/scrims/new',
     '/teams/new',
     '/lobby',
-    '/admin',
   ];
 
   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route)) || pathname.endsWith('/edit');
@@ -130,13 +159,6 @@ export async function middleware(request: NextRequest) {
     const loginUrl = getSafeRedirectUrl('/login', request);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
-  }
-
-  // 6. Admin routes check
-  if (pathname.startsWith('/admin')) {
-    if (!session || session.role !== 'ADMIN') {
-      return NextResponse.redirect(getSafeRedirectUrl('/', request));
-    }
   }
 
   return NextResponse.next();

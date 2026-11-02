@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUser } from '@/hooks/useUser';
 import { Users, Upload, AlertCircle, CheckCircle2, Flame } from 'lucide-react';
+import { TeamLogo } from '@/components/ui/TeamLogo';
 
 export default function CreateTeamPage() {
   const router = useRouter();
@@ -168,13 +169,11 @@ export default function CreateTeamPage() {
                 className="relative w-24 h-24 rounded-xl border-2 border-dashed border-[#222222] hover:border-white bg-[#0a0a0a] cursor-pointer flex flex-col items-center justify-center overflow-hidden transition-all group"
               >
                 {logoUrl ? (
-                  <Image
-                    src={logoUrl}
-                    alt="Logo Preview"
-                    width={96}
-                    height={96}
-                    className="object-cover w-full h-full"
-                    unoptimized
+                  <TeamLogo
+                    logoUrl={logoUrl}
+                    name={name || 'Новая команда'}
+                    tag={tag || 'TEAM'}
+                    size={96}
                   />
                 ) : (
                   <>

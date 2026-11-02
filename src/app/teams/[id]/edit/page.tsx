@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { TeamLogo } from '@/components/ui/TeamLogo';
 import {
   Upload,
   UserPlus,
@@ -293,13 +294,11 @@ export default function EditTeamPage() {
                 className="relative w-20 h-20 rounded-xl border border-dashed border-border hover:border-white bg-cs-panel cursor-pointer flex flex-col items-center justify-center overflow-hidden transition-all shrink-0"
               >
                 {logoUrl ? (
-                  <Image
-                    src={logoUrl}
-                    alt="Logo"
-                    width={80}
-                    height={80}
-                    className="object-cover w-full h-full"
-                    unoptimized
+                  <TeamLogo
+                    logoUrl={logoUrl}
+                    name={name || team.name}
+                    tag={tag || team.tag}
+                    size={80}
                   />
                 ) : (
                   <Upload className="w-5 h-5 text-muted-foreground" />
@@ -404,6 +403,13 @@ export default function EditTeamPage() {
                 onChange={(e) => setDiscordInvite(e.target.value)}
                 placeholder="https://discord.gg/..."
               />
+              <p className="text-[11px] text-muted-foreground">
+                Ссылка-приглашение для страницы команды. Оповещения об откликах на праки в канал настраиваются через{' '}
+                <Link href="/settings#discord-webhook" className="text-amber-400 hover:underline font-semibold">
+                  Discord Webhook в Настройках профиля (PRO) ↗
+                </Link>
+                .
+              </p>
             </div>
 
             <Button type="submit" variant="cs" disabled={saving} className="gap-2 font-bold">

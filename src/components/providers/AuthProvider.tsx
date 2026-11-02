@@ -10,11 +10,23 @@ export interface UserTeamSummary {
   tag: string;
   logoUrl: string | null;
   isOwner: boolean;
+  isPro?: boolean;
+  discordWebhookUrl?: string | null;
+}
+
+export interface ActiveMatchSummary {
+  id: string;
+  format: string;
+  status: string;
+  scheduledAt: string;
+  teamA: { id: string; name: string; tag: string; logoUrl?: string | null };
+  teamB: { id: string; name: string; tag: string; logoUrl?: string | null };
 }
 
 export interface AuthUser extends SafeUser {
   unreadNotifications: number;
   teams: UserTeamSummary[];
+  activeMatch?: ActiveMatchSummary | null;
 }
 
 interface AuthContextType {
@@ -32,23 +44,8 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const saved = sessionStorage.getItem('ascent_user_session');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [loading, setLoading] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    try {
-      return !sessionStorage.getItem('ascent_user_session');
-    } catch {
-      return true;
-    }
-  });
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -127,6 +124,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('ascent_user_session');
+      if (saved) {
+        setUser(JSON.parse(saved));
+        setLoading(false);
+      }
+    } catch {}
     fetchSession(0);
     return () => {
       if (retryTimeoutRef.current) {

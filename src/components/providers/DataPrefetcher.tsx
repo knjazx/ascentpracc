@@ -5,9 +5,9 @@ import { getClientCache, setClientCache } from '@/lib/client-cache';
 
 export function DataPrefetcher() {
   useEffect(() => {
-    // Run background prefetch 150ms after initial page load when browser is idle
-    const timer = setTimeout(() => {
-      // 1. Scrims
+    // Schedule background prefetch during browser idle time (or fallback after 80ms)
+    const runPrefetch = () => {
+      // 1. Scrims Feed
       const scrimsKey = 'feed:1::all:all:all:all';
       if (!getClientCache(scrimsKey)) {
         fetch('/api/scrims?page=1&limit=12')
@@ -23,30 +23,40 @@ export function DataPrefetcher() {
           .catch(() => {});
       }
 
-      // 2. Teams
+      // 2. Teams Catalog (aligned with limit=36)
       const teamsKey = 'teams:';
       if (!getClientCache(teamsKey)) {
-        fetch('/api/teams?search=&limit=24')
+        fetch('/api/teams?search=&limit=36')
           .then((r) => r.json())
           .then((d) => {
             if (d.success && d.data) {
-              setClientCache(teamsKey, d.data.teams);
+              const list = Array.isArray(d.data.teams) ? d.data.teams : (Array.isArray(d.data) ? d.data : []);
+              setClientCache(teamsKey, list);
             }
           })
           .catch(() => {});
       }
 
-      // 3. Matches
-      const matchesKey = 'matches:ALL:::1';
-      if (!getClientCache(matchesKey)) {
-        fetch('/api/matches?page=1&limit=15')
+      // 3. Matches (Both MY and FINISHED subtabs pre-warmed)
+      const myMatchesKey = 'matches:MY:::1';
+      if (!getClientCache(myMatchesKey)) {
+        fetch('/api/matches?myOnly=true&page=1&limit=15')
           .then((r) => r.json())
           .then((d) => {
             if (d.success && d.data) {
-              setClientCache(matchesKey, {
-                matches: d.data.matches,
-                totalPages: d.data.pagination.totalPages,
-              });
+              setClientCache(myMatchesKey, d.data);
+            }
+          })
+          .catch(() => {});
+      }
+
+      const finishedMatchesKey = 'matches:FINISHED:::1';
+      if (!getClientCache(finishedMatchesKey)) {
+        fetch('/api/matches?status=CONFIRMED,DISPUTED,CANCELLED&page=1&limit=15')
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.success && d.data) {
+              setClientCache(finishedMatchesKey, d.data);
             }
           })
           .catch(() => {});
@@ -67,9 +77,22 @@ export function DataPrefetcher() {
           })
           .catch(() => {});
       }
-    }, 150);
+    };
 
-    return () => clearTimeout(timer);
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(
+        runPrefetch,
+        { timeout: 1500 }
+      );
+      return () => {
+        if ('cancelIdleCallback' in window) {
+          (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(id);
+        }
+      };
+    } else {
+      const timer = setTimeout(runPrefetch, 80);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   return null;

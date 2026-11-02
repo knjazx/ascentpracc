@@ -104,10 +104,11 @@ export async function sendDiscordDirectMessage(params: {
   recipientId: string;
   embed: DiscordEmbed;
   content?: string;
-}): Promise<boolean> {
+}): Promise<{ success: boolean; error?: string }> {
   const botToken = process.env.DISCORD_BOT_TOKEN;
   if (!botToken) {
-    return false;
+    console.error('[Discord Bot DM] DISCORD_BOT_TOKEN is missing in environment!');
+    return { success: false, error: 'DISCORD_BOT_TOKEN не настроен на сервере' };
   }
 
   try {
@@ -124,7 +125,11 @@ export async function sendDiscordDirectMessage(params: {
     if (!channelRes.ok) {
       const errText = await channelRes.text();
       console.warn(`[Discord Bot DM] Failed to open DM with ${params.recipientId}:`, errText);
-      return false;
+      let errorMsg = 'Не удалось открыть ЛС с пользователем';
+      if (channelRes.status === 403 || errText.includes('50007')) {
+        errorMsg = 'У пользователя закрыты личные сообщения от участников сервера в Discord';
+      }
+      return { success: false, error: errorMsg };
     }
 
     const channelData = await channelRes.json();
@@ -153,13 +158,13 @@ export async function sendDiscordDirectMessage(params: {
     if (!messageRes.ok) {
       const msgErr = await messageRes.text();
       console.warn(`[Discord Bot DM] Failed to send message to channel ${dmChannelId}:`, msgErr);
-      return false;
+      return { success: false, error: 'Discord отклонил отправку сообщения в ЛС' };
     }
 
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: unknown) {
     console.error('[Discord Bot DM] Error sending DM:', err);
-    return false;
+    return { success: false, error: err instanceof Error ? err.message : 'Внутренняя ошибка сети' };
   }
 }
 
@@ -215,9 +220,10 @@ export async function notifyScrimResponseInDM(params: {
   respondingTeamTag: string;
   slotTimeText: string;
   message?: string | null;
-  disableVertigo?: boolean;
   scrimId: string;
   platform?: string;
+  trustScore?: number;
+  avgElo?: number | null;
 }): Promise<boolean> {
   const userId = await resolveDiscordUserId(params.recipientDiscordIdOrTag);
   if (!userId) {
@@ -231,15 +237,17 @@ export async function notifyScrimResponseInDM(params: {
   const fields: DiscordEmbedField[] = [
     { name: 'Время матча', value: `⏰ ${params.slotTimeText}`, inline: true },
     { name: 'Платформа', value: `🌐 ${params.platform || 'CS2 Server'}`, inline: true },
+    {
+      name: 'Рейтинг доверия',
+      value: `🛡️ ${typeof params.trustScore === 'number' ? `${params.trustScore}%` : '100%'}`,
+      inline: true,
+    },
+    {
+      name: 'AVG ELO команды',
+      value: `⭐ ${params.avgElo ? `${params.avgElo} ELO` : 'Не указан'}`,
+      inline: true,
+    },
   ];
-
-  if (params.disableVertigo) {
-    fields.push({
-      name: 'Расширенный пул',
-      value: '🚫 Соперник отключил карту Vertigo',
-      inline: false,
-    });
-  }
 
   if (params.message) {
     fields.push({
@@ -249,7 +257,7 @@ export async function notifyScrimResponseInDM(params: {
     });
   }
 
-  return sendDiscordDirectMessage({
+  const result = await sendDiscordDirectMessage({
     recipientId: userId,
     embed: {
       title: `📩 Новый отклик на ваш прак!`,
@@ -260,6 +268,8 @@ export async function notifyScrimResponseInDM(params: {
       footer: { text: 'ASCENT HELPER • Оповещение о праках' },
     },
   });
+
+  return result.success;
 }
 
 export async function notifyNewScrimRequest(params: {

@@ -15,13 +15,20 @@ import {
   Bell,
   ChevronDown,
   Lock,
+  Swords,
+  Sparkles,
 } from 'lucide-react';
 import { SteamIcon } from '@/components/icons/SteamIcon';
 
 export function UserMenu() {
   const { user, loading, logout } = useUser();
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close dropdown on click outside or escape key
   useEffect(() => {
@@ -45,7 +52,7 @@ export function UserMenu() {
     };
   }, []);
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="flex items-center gap-2 animate-pulse">
         <div className="w-8 h-8 rounded-full bg-muted"></div>
@@ -77,6 +84,11 @@ export function UserMenu() {
           <span className="text-sm font-semibold text-foreground leading-tight max-w-[120px] truncate">
             {user.nickname}
           </span>
+          {user.isPro && (
+            <span className="px-1.5 py-0.2 rounded bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black font-mono text-[9px] uppercase tracking-wider">
+              PRO
+            </span>
+          )}
           {user.role === 'ADMIN' && (
             <Badge variant="admin" className="text-[10px] px-1.5 py-0">
               ADMIN
@@ -93,10 +105,56 @@ export function UserMenu() {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-card p-2 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95 duration-150">
           {/* User quick info header */}
-          <div className="px-3 py-2.5 border-b border-border/60 mb-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">Профиль</p>
-            <p className="text-sm font-bold text-foreground truncate mt-0.5">{user.nickname}</p>
+          <div className="px-3 py-2.5 border-b border-border/60 mb-1 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">Профиль</p>
+              <p className="text-sm font-bold text-foreground truncate mt-0.5">{user.nickname}</p>
+            </div>
+            {user.isPro && (
+              <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black font-mono text-[9px] uppercase tracking-wider shadow">
+                PRO
+              </span>
+            )}
           </div>
+
+          {/* Subscription Link */}
+          <div className="py-1 border-b border-border/60 mb-1">
+            <Link
+              href="/subscription"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg hover:bg-neutral-800 transition-colors text-amber-400"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Подписка PRO</span>
+              </div>
+              {user.isPro ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono font-bold">
+                  АКТИВНА
+                </span>
+              ) : (
+                <span className="text-[10px] text-neutral-400 font-mono">
+                  Free
+                </span>
+              )}
+            </Link>
+          </div>
+
+          {/* Active Match Jump Link */}
+          {user.activeMatch && (
+            <div className="p-1 mb-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+              <Link
+                href={`/lobby/${user.activeMatch.id}`}
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-between px-2 py-1.5 text-xs font-bold text-emerald-400 hover:text-white transition-colors"
+              >
+                <div className="flex items-center gap-1.5 font-mono truncate">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <span className="truncate">В лобби: [{user.activeMatch.teamA.tag}] vs [{user.activeMatch.teamB.tag}]</span>
+                </div>
+              </Link>
+            </div>
+          )}
 
           {/* Teams Section */}
           <div className="py-1">
@@ -146,6 +204,15 @@ export function UserMenu() {
 
           {/* Navigation Links */}
           <div className="space-y-0.5">
+            <Link
+              href="/matches?my=true"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-md hover:bg-white/5 text-foreground transition-colors"
+            >
+              <Swords className="w-4 h-4 text-emerald-400" />
+              <span>Мои матчи и лобби</span>
+            </Link>
+
             <Link
               href="/teams"
               onClick={() => setIsOpen(false)}

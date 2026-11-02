@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 import prisma from '@/lib/prisma';
 import { verifyUserToken } from '@/lib/jwt';
 import { SafeUser } from '@/types';
@@ -7,9 +8,22 @@ import { User, Role } from '@prisma/client';
 import { memoryCache } from '@/lib/memory-cache';
 
 export const AUTH_COOKIE_NAME = 'cs2_session';
+export const ADMIN_COOKIE_NAME = 'ascent_admin_token';
 export const NONCE_COOKIE_NAME = 'cs2_steam_nonce';
 export const AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 export const NONCE_COOKIE_MAX_AGE = 10 * 60; // 10 minutes in seconds
+const DEFAULT_JWT_SECRET = 'super_secret_jwt_key_cs2_scrim_league_at_least_32_chars_long';
+
+export async function verifyAdminToken(token: string): Promise<boolean> {
+  try {
+    const secret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+    const key = new TextEncoder().encode(secret);
+    const { payload } = await jwtVerify(token, key, { algorithms: ['HS256'] });
+    return Boolean(payload?.isAdmin);
+  } catch {
+    return false;
+  }
+}
 
 export function getRequestBaseUrl(request: NextRequest): string {
   // 1. Check proxy forwarding headers (Render, Vercel, Cloudflare, etc.)
@@ -46,6 +60,9 @@ export function createSafeRedirectUrl(pathnameAndQuery: string, request: NextReq
 }
 
 export function toSafeUser(user: User): SafeUser {
+  const isProActive = Boolean(
+    user.isPro && (!user.proExpiresAt || new Date(user.proExpiresAt).getTime() > Date.now())
+  );
   return {
     id: user.id,
     steamId: user.steamId,
@@ -57,6 +74,10 @@ export function toSafeUser(user: User): SafeUser {
     role: user.role,
     banned: user.banned,
     onboarded: user.onboarded,
+    isPro: isProActive,
+    proExpiresAt: user.proExpiresAt?.toISOString() || null,
+    ascentCoins: user.ascentCoins ?? 1000,
+    discordWebhookUrl: user.discordWebhookUrl || null,
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -82,21 +103,48 @@ export function sanitizeNextUrl(rawUrl: string | null | undefined): string {
 export async function getCurrentUser(): Promise<SafeUser | null> {
   try {
     const cookieStore = cookies();
+    const adminToken = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+    const hasAdminToken = adminToken ? await verifyAdminToken(adminToken) : false;
+
     const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
 
     if (!token) {
+      if (hasAdminToken) {
+        return {
+          id: 'admin_knjazx',
+          steamId: 'ADMIN_KNJAZX',
+          nickname: 'knjazx (Admin)',
+          avatarUrl: 'https://cdn-icons-png.flaticon.com/512/8065/8065074.png',
+          timezone: 'Europe/Kyiv',
+          discordTag: 'knjazx',
+          discordId: '653616783281881089',
+          role: Role.ADMIN,
+          banned: false,
+          onboarded: true,
+          createdAt: new Date().toISOString(),
+        };
+      }
       return null;
     }
 
     const payload = await verifyUserToken(token);
     if (!payload || (!payload.userId && !payload.steamId)) {
+      if (hasAdminToken) {
+        return {
+          id: 'admin_knjazx',
+          steamId: 'ADMIN_KNJAZX',
+          nickname: 'knjazx (Admin)',
+          avatarUrl: 'https://cdn-icons-png.flaticon.com/512/8065/8065074.png',
+          timezone: 'Europe/Kyiv',
+          discordTag: 'knjazx',
+          discordId: '653616783281881089',
+          role: Role.ADMIN,
+          banned: false,
+          onboarded: true,
+          createdAt: new Date().toISOString(),
+        };
+      }
       return null;
-    }
-
-    const sessionCacheKey = `user:session:${payload.userId || payload.steamId}`;
-    const cachedUser = memoryCache.get<SafeUser>(sessionCacheKey);
-    if (cachedUser) {
-      return cachedUser;
     }
 
     let user: User | null = null;
@@ -130,22 +178,37 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
     }
 
     if (!user) {
+      if (hasAdminToken) {
+        return {
+          id: 'admin_knjazx',
+          steamId: 'ADMIN_KNJAZX',
+          nickname: 'knjazx (Admin)',
+          avatarUrl: 'https://cdn-icons-png.flaticon.com/512/8065/8065074.png',
+          timezone: 'Europe/Kyiv',
+          discordTag: 'knjazx',
+          discordId: '653616783281881089',
+          role: Role.ADMIN,
+          banned: false,
+          onboarded: true,
+          createdAt: new Date().toISOString(),
+        };
+      }
       return null;
     }
 
-    // Always keep admin status synchronized with environment configuration
-    if (isSteamIdAdmin(user.steamId) && user.role !== Role.ADMIN) {
+    // Always keep admin status synchronized with environment configuration or admin token
+    if ((isSteamIdAdmin(user.steamId) || hasAdminToken) && user.role !== Role.ADMIN) {
       const updated = await prisma.user.update({
         where: { id: user.id },
         data: { role: Role.ADMIN },
       });
-      const safeAdmin = toSafeUser(updated);
-      memoryCache.set(sessionCacheKey, safeAdmin, 60);
-      return safeAdmin;
+      return toSafeUser(updated);
     }
 
     const safe = toSafeUser(user);
-    memoryCache.set(sessionCacheKey, safe, 60);
+    if (hasAdminToken) {
+      safe.role = Role.ADMIN;
+    }
     return safe;
   } catch (error) {
     console.error('Error fetching current user:', error);

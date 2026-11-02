@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { VetoState, VetoStep, TeamRole, PickedMapResult } from './types';
 import { VetoType, SideChoice, ScrimFormat, MatchStatus } from '@prisma/client';
 
-export const TURN_DURATION_SEC = 60;
+export const TURN_DURATION_SEC = 30;
 
 export function generateVetoSteps(
   format: ScrimFormat,
@@ -15,91 +15,67 @@ export function generateVetoSteps(
   let order = 1;
 
   if (format === 'BO1') {
-    // Standard BO1: Ban until 1 map remains, then side choice on decider
-    // Total bans needed = totalAvailableMaps - 1
+    // БО1: бан бан бан бан бан бан десайдер, стороны через ножевой раунд
+    // Total bans needed to leave exactly 1 map = Math.max(0, totalAvailableMaps - 1)
     const bansNeeded = Math.max(0, totalAvailableMaps - 1);
     for (let i = 0; i < bansNeeded; i++) {
       const teamRole = i % 2 === 0 ? firstRole : secondRole;
       steps.push({ order: order++, teamRole, actionType: VetoType.BAN });
     }
-    // Last decider side is chosen by the team that banned second
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE });
+    // No SIDE step in BO1: sides decided via knife round in-game
   } else if (format === 'BO3') {
-    // Dynamic competitive BO3:
-    // Requires 2 picks and 1 decider = 3 maps.
-    // 1. Initial bans (if at least 6 maps available, ban 1 each)
-    const initialBans = totalAvailableMaps >= 6 ? 2 : 0;
-    if (initialBans === 2) {
-      steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
-      steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.BAN });
+    // БО3: пик пик бан бан бан бан десайдер, сторону выбирает противоположная команда от той которая пикнула карту
+    // 1. Picks (up to 2, leaving at least 1 for decider)
+    const picksPossible = Math.min(2, Math.max(0, totalAvailableMaps - 1));
+
+    if (picksPossible >= 1) {
+      steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
+      steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE });
+    }
+    if (picksPossible >= 2) {
+      steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
+      steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE });
     }
 
-    // 2. Picks
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE }); // Opponent picks side
+    // 2. Bans: ban down until exactly 1 decider map remains
+    const mapsLeftForBans = Math.max(0, totalAvailableMaps - picksPossible);
+    const bansNeeded = Math.max(0, mapsLeftForBans - 1);
 
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE }); // Opponent picks side
-
-    // 3. Second ban phase: ban down until exactly 1 decider map remains
-    const remainingBans = Math.max(0, totalAvailableMaps - initialBans - 2 - 1);
-    let lastBanRole: TeamRole = secondRole;
-    for (let i = 0; i < remainingBans; i++) {
-      lastBanRole = i % 2 === 0 ? firstRole : secondRole;
-      steps.push({ order: order++, teamRole: lastBanRole, actionType: VetoType.BAN });
+    for (let i = 0; i < bansNeeded; i++) {
+      const teamRole = i % 2 === 0 ? firstRole : secondRole;
+      steps.push({ order: order++, teamRole, actionType: VetoType.BAN });
     }
-
-    // 4. Side choice on decider
-    const deciderSideRole: TeamRole = remainingBans > 0
-      ? (lastBanRole === 'TEAM_A' ? 'TEAM_B' : 'TEAM_A')
-      : secondRole;
-    steps.push({ order: order++, teamRole: deciderSideRole, actionType: VetoType.SIDE });
+    // Remaining 1 map is automatically Decider (knife round)
   } else if (format === 'BO5') {
-    // Dynamic competitive BO5:
-    // Requires 4 picks and 1 decider = 5 maps.
-    // 1. Initial bans (if more than 5 maps available)
-    const initialBans = totalAvailableMaps >= 7 ? 2 : totalAvailableMaps > 5 ? 1 : 0;
-    if (initialBans >= 1) {
-      steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
-    }
-    if (initialBans >= 2) {
-      steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.BAN });
+    // БО5: бан бан пик пик пик пик десайдер
+    // Need 5 maps total (4 picks + 1 decider).
+    // Initial bans = Math.max(0, totalAvailableMaps - 5)
+    const bansNeeded = Math.max(0, totalAvailableMaps - 5);
+    for (let i = 0; i < bansNeeded; i++) {
+      const teamRole = i % 2 === 0 ? firstRole : secondRole;
+      steps.push({ order: order++, teamRole, actionType: VetoType.BAN });
     }
 
-    // 2. Picks
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE }); // Opponent picks side
+    // Picks after bans
+    const mapsAfterBans = totalAvailableMaps - bansNeeded;
+    const picksPossible = Math.min(4, Math.max(0, mapsAfterBans - 1));
 
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE });
-
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE });
-
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE });
-
-    // 3. Second ban phase: ban down until exactly 1 decider map remains
-    const remainingBans = Math.max(0, totalAvailableMaps - initialBans - 4 - 1);
-    let lastBanRole: TeamRole = secondRole;
-    for (let i = 0; i < remainingBans; i++) {
-      lastBanRole = i % 2 === 0 ? firstRole : secondRole;
-      steps.push({ order: order++, teamRole: lastBanRole, actionType: VetoType.BAN });
+    for (let i = 0; i < picksPossible; i++) {
+      const pickRole = i % 2 === 0 ? firstRole : secondRole;
+      const sideRole = i % 2 === 0 ? secondRole : firstRole;
+      steps.push({ order: order++, teamRole: pickRole, actionType: VetoType.PICK });
+      steps.push({ order: order++, teamRole: sideRole, actionType: VetoType.SIDE });
     }
-
-    // 4. Side choice on decider
-    const deciderSideRole: TeamRole = remainingBans > 0
-      ? (lastBanRole === 'TEAM_A' ? 'TEAM_B' : 'TEAM_A')
-      : secondRole;
-    steps.push({ order: order++, teamRole: deciderSideRole, actionType: VetoType.SIDE });
+    // Remaining 1 map is automatically Decider (knife round)
   } else if (format === 'BO2') {
-    // BO2 Scrim format: each team picks 1 map, opponent picks starting side
-    steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.BAN });
-    steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.BAN });
-
+    // BO2: пик пик, противоположная сторона выбирает сторону
+    const bansNeeded = Math.max(0, totalAvailableMaps - 2);
+    for (let i = 0; i < bansNeeded; i++) {
+      const teamRole = i % 2 === 0 ? firstRole : secondRole;
+      steps.push({ order: order++, teamRole, actionType: VetoType.BAN });
+    }
     steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.PICK });
     steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.SIDE });
-
     steps.push({ order: order++, teamRole: secondRole, actionType: VetoType.PICK });
     steps.push({ order: order++, teamRole: firstRole, actionType: VetoType.SIDE });
   }
@@ -207,19 +183,16 @@ export async function getVetoState(matchId: string): Promise<VetoState | null> {
     (m) => !bannedMaps.includes(m) && !pickedMaps.some((p) => p.map === m)
   );
 
-  const currentStepIndex = actions.length;
-  const isFinished = currentStepIndex >= steps.length || (match.format === 'BO1' && availableMaps.length === 1 && steps[currentStepIndex]?.actionType !== VetoType.SIDE);
+  const stepActions = actions.filter((a) => a.type !== VetoType.DECIDER);
+  const currentStepIndex = stepActions.length;
+  const isFinished = currentStepIndex >= steps.length || availableMaps.length === 0;
 
   const currentStep = !isFinished ? steps[currentStepIndex] : null;
 
-  // Compute target map for SIDE step
+  // Compute target map for SIDE step (the map that was just picked)
   let currentTargetMap: string | undefined;
   if (currentStep?.actionType === VetoType.SIDE) {
-    if (match.format === 'BO1') {
-      currentTargetMap = availableMaps[0];
-    } else {
-      currentTargetMap = pickedMaps[pickedMaps.length - 1]?.map || availableMaps[0];
-    }
+    currentTargetMap = pickedMaps[pickedMaps.length - 1]?.map || availableMaps[0];
   }
 
   // Calculate remaining timer from last action
@@ -256,6 +229,10 @@ export async function startVeto(matchId: string): Promise<VetoState> {
   });
 
   if (!match) throw new Error('Матч не найден');
+
+  // Clear previous actions if restarting
+  await prisma.vetoAction.deleteMany({ where: { matchId } });
+  await prisma.matchMap.deleteMany({ where: { matchId } });
 
   // Coinflip with crypto.randomInt
   const coinFlipWinnerId = crypto.randomInt(0, 2) === 0 ? match.teamAId : match.teamBId;
@@ -321,6 +298,17 @@ export async function processVetoAction(
         map: selectedMap,
       },
     });
+
+    await prisma.chatMessage.create({
+      data: {
+        matchId,
+        system: true,
+        text:
+          currentStep.actionType === VetoType.BAN
+            ? `🚫 [${expectedTeam.tag}] забанила ${selectedMap.replace('de_', '')}`
+            : `🎯 [${expectedTeam.tag}] выбрала ${selectedMap.replace('de_', '')}`,
+      },
+    });
   } else if (currentStep.actionType === VetoType.SIDE) {
     const side = actionData.side;
     if (!side || ![SideChoice.CT, SideChoice.T].includes(side)) {
@@ -337,6 +325,14 @@ export async function processVetoAction(
         type: VetoType.SIDE,
         map: targetMap,
         side,
+      },
+    });
+
+    await prisma.chatMessage.create({
+      data: {
+        matchId,
+        system: true,
+        text: `🛡️ [${expectedTeam.tag}] выбрала сторону ${side} на ${targetMap.replace('de_', '')}`,
       },
     });
   }
@@ -356,12 +352,21 @@ export async function processVetoAction(
     await prisma.vetoAction.create({
       data: {
         matchId,
-        order: state.steps.length - 1, // Before final side choice
+        order: state.actions.length + 1,
         teamId: null,
         type: VetoType.DECIDER,
         map: deciderMap,
       },
     });
+
+    await prisma.chatMessage.create({
+      data: {
+        matchId,
+        system: true,
+        text: `⚔️ Решающая карта (Decider): ${deciderMap.replace('de_', '')}. Стороны через ножевой раунд.`,
+      },
+    });
+
     state = (await getVetoState(matchId))!;
   }
 
@@ -375,29 +380,46 @@ export async function processVetoAction(
 }
 
 export async function processVetoTimeout(matchId: string): Promise<VetoState> {
-  const state = await getVetoState(matchId);
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+  });
+  if (!match) throw new Error('Матч не найден');
+
+  let state = await getVetoState(matchId);
   if (!state || state.isFinished || !state.currentActionType) {
     return state!;
   }
 
   const currentStep = state.steps[state.currentStepIndex];
-  const expectedTeamId = currentStep.teamRole === 'TEAM_A' ? state.coinFlipWinnerId : state.matchId;
+  const expectedTeamId = currentStep.teamRole === 'TEAM_A' ? match.teamAId : match.teamBId;
 
   if (currentStep.actionType === VetoType.BAN || currentStep.actionType === VetoType.PICK) {
-    // Pick random available map
-    const randomMap = state.availableMaps[crypto.randomInt(0, state.availableMaps.length)];
-    await prisma.vetoAction.create({
-      data: {
-        matchId,
-        order: currentStep.order,
-        teamId: expectedTeamId,
-        type: currentStep.actionType,
-        map: randomMap,
-      },
-    });
+    if (state.availableMaps.length > 0) {
+      // Pick random available map
+      const randomMap = state.availableMaps[crypto.randomInt(0, state.availableMaps.length)];
+      await prisma.vetoAction.create({
+        data: {
+          matchId,
+          order: currentStep.order,
+          teamId: expectedTeamId,
+          type: currentStep.actionType,
+          map: randomMap,
+        },
+      });
+
+      await prisma.chatMessage.create({
+        data: {
+          matchId,
+          system: true,
+          text: `⏳ Время на ход истекло! Автоматически ${
+            currentStep.actionType === VetoType.BAN ? 'забанена' : 'выбрана'
+          } карта ${randomMap.replace('de_', '')}.`,
+        },
+      });
+    }
   } else if (currentStep.actionType === VetoType.SIDE) {
     const randomSide = crypto.randomInt(0, 2) === 0 ? SideChoice.CT : SideChoice.T;
-    const targetMap = state.currentTargetMap || state.availableMaps[0];
+    const targetMap = state.currentTargetMap || state.pickedMaps[state.pickedMaps.length - 1]?.map || state.availableMaps[0];
     await prisma.vetoAction.create({
       data: {
         matchId,
@@ -408,9 +430,47 @@ export async function processVetoTimeout(matchId: string): Promise<VetoState> {
         side: randomSide,
       },
     });
+
+    await prisma.chatMessage.create({
+      data: {
+        matchId,
+        system: true,
+        text: `⏳ Время на выбор стороны истекло! Автоматически выбрана сторона ${randomSide}.`,
+      },
+    });
   }
 
-  const updatedState = (await getVetoState(matchId))!;
+  let updatedState = (await getVetoState(matchId))!;
+
+  // Check if Decider map should be finalized automatically
+  const currentAvailable = updatedState.availableMaps;
+  if (
+    (updatedState.format === 'BO1' || updatedState.format === 'BO3' || updatedState.format === 'BO5') &&
+    currentAvailable.length === 1 &&
+    !updatedState.pickedMaps.some((p) => p.map === currentAvailable[0])
+  ) {
+    const deciderMap = currentAvailable[0];
+    await prisma.vetoAction.create({
+      data: {
+        matchId,
+        order: updatedState.actions.length + 1,
+        teamId: null,
+        type: VetoType.DECIDER,
+        map: deciderMap,
+      },
+    });
+
+    await prisma.chatMessage.create({
+      data: {
+        matchId,
+        system: true,
+        text: `⚔️ Решающая карта (Decider): ${deciderMap.replace('de_', '')}. Стороны через ножевой раунд.`,
+      },
+    });
+
+    updatedState = (await getVetoState(matchId))!;
+  }
+
   if (updatedState.isFinished) {
     await finalizeVeto(matchId, updatedState);
   }

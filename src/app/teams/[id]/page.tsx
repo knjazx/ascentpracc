@@ -13,6 +13,7 @@ import { getClientCache, setClientCache } from '@/lib/client-cache';
 import { ChallengeModal } from '@/components/teams/ChallengeModal';
 import { FaceitBadge } from '@/components/ui/FaceitBadge';
 import { TrustGauge } from '@/components/ui/TrustGauge';
+import { TeamLogo } from '@/components/ui/TeamLogo';
 import {
   Trophy,
   Users,
@@ -32,49 +33,6 @@ import {
   Minus,
   AlertTriangle,
 } from 'lucide-react';
-
-function TeamProfileLogo({
-  logoUrl,
-  name,
-  tag,
-}: {
-  logoUrl?: string | null;
-  name: string;
-  tag: string;
-}) {
-  const [hasError, setHasError] = useState(false);
-
-  const isValidUrl =
-    Boolean(logoUrl) &&
-    !hasError &&
-    (logoUrl!.startsWith('http://') ||
-      logoUrl!.startsWith('https://') ||
-      logoUrl!.startsWith('/') ||
-      logoUrl!.startsWith('data:image/'));
-
-  if (!isValidUrl) {
-    const initials = (tag || name.slice(0, 3) || 'CS').toUpperCase().slice(0, 4);
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#222222] via-[#161616] to-[#0c0c0c] border border-white/5 select-none text-white relative">
-        <span className="font-mono font-black text-2xl tracking-wider text-white/90 drop-shadow">
-          {initials}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <Image
-      src={logoUrl!}
-      alt={name}
-      width={96}
-      height={96}
-      className="object-cover w-full h-full"
-      unoptimized
-      onError={() => setHasError(true)}
-    />
-  );
-}
 
 interface TeamDetail {
   id: string;
@@ -306,10 +264,11 @@ export default function TeamProfilePage() {
           <div className="flex items-center gap-5">
             {/* Logo */}
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-[#0a0a0a] border border-[#222222] flex items-center justify-center overflow-hidden shrink-0 shadow-lg shadow-black/40">
-              <TeamProfileLogo
+              <TeamLogo
                 logoUrl={team.logoUrl}
                 name={team.name}
                 tag={team.tag}
+                size={96}
               />
             </div>
 

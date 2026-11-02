@@ -48,6 +48,21 @@ export const discordIdSchema = z
   .optional()
   .nullable();
 
+export const discordWebhookUrlSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) => {
+      if (!val || val.length === 0) return true;
+      return /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(val);
+    },
+    {
+      message: 'Некорректная ссылка на Discord Webhook (формат: https://discord.com/api/webhooks/...)',
+    }
+  )
+  .optional()
+  .nullable();
+
 export const onboardingSchema = z.object({
   timezone: timezoneSchema,
   discordTag: discordTagSchema,
@@ -58,6 +73,7 @@ export const updateProfileSchema = z.object({
   timezone: timezoneSchema.optional(),
   discordTag: discordTagSchema,
   discordId: discordIdSchema,
+  discordWebhookUrl: discordWebhookUrlSchema,
 });
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
